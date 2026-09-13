@@ -257,7 +257,7 @@ def edit_trip(trip_id: str, change: EditTrip, request: Request):
             revised["excluded_places"] = sorted(excluded)
             plan = revised
         else:
-            from .planner import time_label, travel_minutes
+            from .planner import time_label, travel_estimate
 
             for day in plan["days"]:
                 if not any(s["id"] == change.stop_id for s in day["stops"]):
@@ -265,13 +265,15 @@ def edit_trip(trip_id: str, change: EditTrip, request: Request):
                 if len(day["stops"]) == 1:
                     raise HTTPException(422, "Keep at least one stop in each day.")
                 day["stops"] = [s for s in day["stops"] if s["id"] != change.stop_id]
-                previous = {"lat": 9.9657, "lng": 76.242}
+                previous = None
                 clock = 9 * 60
                 for stop in day["stops"]:
-                    travel = travel_minutes(previous, stop["place"])
+                    travel, travel_mode = (
+                        travel_estimate(previous, stop["place"]) if previous else (0, "start")
+                    )
                     start = max(clock + travel, stop["place"]["opens"] * 60)
                     end = start + stop["place"]["duration"]
-                    if end > min(18 * 60, stop["place"]["closes"] * 60):
+                    if end > min(22 * 60, stop["place"]["closes"] * 60):
                         raise HTTPException(
                             422,
                             "Removing this stop would make the remaining route infeasible. Your original plan is unchanged.",
@@ -280,11 +282,16 @@ def edit_trip(trip_id: str, change: EditTrip, request: Request):
                         start=time_label(start),
                         end=time_label(end),
                         travel_minutes=travel,
+                        travel_mode=travel_mode,
                     )
                     previous = stop["place"]
                     clock = end + 20
                 day["cost"] = 400 + sum(s["place"]["cost"] for s in day["stops"])
+                day["budget_utilization"] = round(day["cost"] / plan["preferences"]["budget"] * 100)
             plan["total_cost"] = sum(d["cost"] for d in plan["days"])
+            plan["budget_utilization"] = round(
+                plan["total_cost"] / (plan["preferences"]["budget"] * len(plan["days"])) * 100
+            )
         connection.execute("UPDATE trips SET plan=? WHERE id=?", (json.dumps(plan), trip_id))
     return {**plan, "id": trip_id}
 

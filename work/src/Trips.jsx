@@ -596,7 +596,7 @@ export function ActiveTrip() {
       <PageHeading
         eyebrow="YOUR PLAN. YOUR PACE."
         title={trip.title}
-        subtitle={`${dateLabel(trip.days[0].date)} · ${trip.days.length} days in Kochi`}
+        subtitle={`${dateLabel(trip.days[0].date)} · ${trip.days.length} ${trip.days.length === 1 ? 'day' : 'days'} in Kochi`}
         action={
           <span className="plan-saved">
             <CheckCircle2 size={18} />
@@ -612,6 +612,9 @@ export function ActiveTrip() {
             <strong>
               {money(trip.total_cost)} <small>/ person</small>
             </strong>
+            {Number.isFinite(trip.budget_utilization) && (
+              <small>{trip.budget_utilization}% of the planned budget</small>
+            )}
           </span>
         </div>
         <div>
@@ -657,7 +660,12 @@ export function ActiveTrip() {
             <h2>
               {dayIndex === 0 ? 'Let the wandering begin.' : 'Another day, another discovery.'}
             </h2>
-            <p>{money(day.cost)} estimated · Area-clustered route · 20-minute breaks</p>
+            <p>
+              {money(day.cost)} estimated
+              {Number.isFinite(day.budget_utilization) &&
+                ` · ${day.budget_utilization}% of daily budget`}{' '}
+              · Area-clustered route · 20-minute breaks
+            </p>
           </div>
           <div className="timeline">
             {day.stops.map((stop, i) => (
@@ -678,6 +686,7 @@ export function ActiveTrip() {
                       {stop.place.duration} min
                     </span>
                     <span>{money(stop.place.cost)}</span>
+                    {stop.place.price_tier === 'premium' && <span>Premium experience</span>}
                     <span>
                       <Footprints size={14} />
                       {stop.travel_mode === 'start'

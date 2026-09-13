@@ -290,7 +290,7 @@ export default function Explore() {
               </span>
               <span>
                 <Heart size={15} />
-                Legitimacy
+                Legitimacy · scam resistance
               </span>
               <span>
                 <Leaf size={15} />

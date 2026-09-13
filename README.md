@@ -6,7 +6,7 @@ A responsive Kochi travel app with a React/JavaScript interface, Python/FastAPI 
 
 - Browse and search eight seeded itinerary collections across twelve Kochi hubs; filter by area, interests or aggregate SLH.
 - Save collections to your guest session.
-- Generate and save 1–3 day trips with selected Kochi areas, budget, interests, pace, dates, opening-window constraints, clustered travel estimates and buffers.
+- Generate and save 1–3 day trips with selected Kochi areas, budget, interests, pace, dates, opening-window constraints, clustered travel estimates and budget utilization.
 - View day timelines and OpenStreetMap pins; launch external walking or transit directions.
 - Replace or remove stops and recalculate schedule and costs before starting progress.
 - Mark stops complete, undo mistakes, persist progress, earn points and badges without duplicate rewards.
@@ -53,7 +53,9 @@ The contribution form then offers an explicit opt-in checkbox. Only submitted st
 
 The venue hours, costs, review counts, SLH ratings and contributor identities are **sample data**, not live or verified information. Some meal stops represent suggested experiences rather than verified businesses. Routes are approximate walking or local-transit estimates with schematic connecting lines, not road routing. Food and local transport have a separate ₹400 daily allowance. Stay and travel to Kochi are excluded.
 
-SLH = `(Safety + Legitimacy + Hygiene) / 15 × 100`, with each dimension rated 1–5. Missing or invalid dimensions result in no rating. An itinerary’s score averages its stop dimensions equally. No score certifies safety. No actual reviews are collected yet.
+Premium dining examples are based on the official venue listings for [Kochi Kitchen](https://www.marriott.com/en-us/hotels/cokmc-kochi-marriott-hotel/dining/), [All Spice](https://www.marriott.com/en-us/dining/restaurant-bar/cokic-courtyard-kochi-infopark/7259411-all-spice.mi) and [SkyGrill](https://www.ihg.com/crowneplaza/hotels/gb/en/kochi/cokch/hoteldetail/dining). Their seeded prices remain illustrative and must be confirmed with the venue.
+
+SLH = `(Safety + Legitimacy + Hygiene) / 15 × 100`, with each dimension rated 1–5. Legitimacy is scam resistance: a higher L score means a lower likelihood of misleading listings, hidden charges or untrustworthy operators. Missing or invalid dimensions result in no rating. An itinerary’s score averages its stop dimensions equally. No score certifies safety. No actual reviews are collected yet.
 
 Story publishing, live stranger matching/chat, verified accounts, moderation, multi-city scale and real routing-provider integration remain beyond this local MVP. Community requests contact nobody. Native Android/iOS packaging is not included; this deliverable is the responsive web application.
 

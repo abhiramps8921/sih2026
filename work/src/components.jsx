@@ -51,7 +51,12 @@ export function SLHDetails({ place, close }) {
       <div className="rating-list">
         {[
           ['Safety', 'safety', ShieldCheck, 'Comfort, access & surroundings'],
-          ['Legitimacy', 'legitimacy', BadgeCheck, 'Accurate listings & transparent pricing'],
+          [
+            'Legitimacy',
+            'legitimacy',
+            BadgeCheck,
+            'Scam resistance, honest listings & transparent pricing',
+          ],
           ['Hygiene', 'hygiene', Droplets, 'Cleanliness & maintenance'],
         ].map(([name, key, Icon, description]) => (
           <div className="rating-item" key={key}>

@@ -44,6 +44,7 @@ def generate_plan(preferences, *, excluded=None, requested=None):
         p
         for p in PLACES
         if p["id"] not in excluded
+        and p["cost"] + 400 <= budget
         and (not preferences.areas or p["area"] in preferences.areas)
         and (not preferences.min_slh or (slh_score(p["slh"]) or 0) >= preferences.min_slh)
     ]
@@ -65,23 +66,30 @@ def generate_plan(preferences, *, excluded=None, requested=None):
         day_target = min(target, max(1, math.ceil(len(remaining) / days_left)))
         for _ in range(day_target):
             feasible = []
+            slots_left = day_target - len(stops)
+            ideal_cost = max(0, (budget - 400 - spent) / slots_left)
             for p in remaining:
                 travel, travel_mode = travel_estimate(previous, p) if previous else (0, "start")
                 start = max(clock + travel, p["opens"] * 60)
                 # Reserve food + local transport per day, outside each stop's cost.
                 if spent + p["cost"] + 400 > budget or start + p["duration"] > min(
-                    18 * 60, p["closes"] * 60
+                    22 * 60, p["closes"] * 60
                 ):
                     continue
                 preference = (80 if p["id"] in chosen_ids else 0) + (
                     40 if p["category"] in preferences.interests else 0
                 )
+                cost_gap = abs(p["cost"] - ideal_cost) / max(ideal_cost, 1)
+                budget_fit = 45 - min(cost_gap, 1.5) * 45
+                premium_bonus = 45 if budget >= 5000 and p["price_tier"] == "premium" else 0
                 rank = (
                     preference
+                    + budget_fit
+                    + premium_bonus
                     + (slh_score(p["slh"]) or 0) / 10
                     + (18 if previous and previous["area"] == p["area"] else 0)
                     - travel / 5
-                    - max(0, start - clock - travel) / 10
+                    - max(0, start - clock - travel) / 5
                 )
                 feasible.append((rank, p, travel, travel_mode, start))
             if not feasible:
@@ -111,12 +119,20 @@ def generate_plan(preferences, *, excluded=None, requested=None):
             warnings.append(
                 f"Day {day + 1} has fewer stops to respect your budget and available time."
             )
+        day_cost = spent + 400
+        utilization = round(day_cost / budget * 100)
+        if budget >= 5000 and utilization < 60:
+            warnings.append(
+                f"Day {day + 1} uses {utilization}% of the budget because matching available "
+                "experiences did not fit the opening hours and travel time."
+            )
         days.append(
             dict(
                 day=day + 1,
                 date=str(preferences.start_date + timedelta(days=day)),
                 stops=stops,
-                cost=spent + 400,
+                cost=day_cost,
+                budget_utilization=utilization,
             )
         )
     missed = [BY_ID[id]["name"] for id in chosen_ids if id not in used]
@@ -130,8 +146,9 @@ def generate_plan(preferences, *, excluded=None, requested=None):
         days=days,
         preferences=preferences.model_dump(mode="json"),
         total_cost=sum(d["cost"] for d in days),
+        budget_utilization=round(sum(d["cost"] for d in days) / (budget * preferences.days) * 100),
         warnings=warnings,
         method="Rule-based local planner",
         routing="Estimated walking or local-transit time; map lines are not road directions",
-        cost_note="Per person. Includes ₹400/day food and local transport allowance; excludes stay and travel to Kochi. Venue prices and hours are sample estimates.",
+        cost_note="Per person. The planner aims to use the available daily budget without exceeding it and includes ₹400/day for food and local transport. Stay and travel to Kochi are excluded. Venue prices and hours are sample estimates.",
     )

@@ -534,7 +534,7 @@ export function SLHGuide() {
           [
             BadgeCheck,
             'Legitimacy',
-            'Does the experience match its description? Consider transparent pricing, accurate listings and misleading claims.',
+            'How likely are you to avoid a scam? A higher score means stronger confidence in honest listings, transparent pricing and trustworthy operators.',
           ],
           [
             Droplets,

@@ -36,6 +36,8 @@ SLH means Safety, Legitimacy and Hygiene. Each dimension is rated from 1 to 5. A
 
 `(Safety + Legitimacy + Hygiene) / 15 × 100`
 
+Legitimacy is the inverse of scam risk. A higher L rating means stronger confidence that the listing, operator, prices and promised experience are authentic and transparent.
+
 An itinerary score averages each dimension across its included places before applying the same formula. A missing or invalid dimension makes the item unrated. The interface shows the dimensions, sample size, evidence date and source status rather than presenting only a composite number.
 
 The seeded values are illustrative demo data. SLH is not a certification or safety guarantee. A production design should separate verified evidence, recent reviews, unresolved reports and low-volume uncertainty.
@@ -46,12 +48,13 @@ The deterministic planner owns feasibility. It:
 
 1. Validates days, budget, pace, interests and minimum SLH.
 2. Filters the place catalog.
-3. Ranks requested and relevant places.
+3. Ranks requested and relevant places, including cost fit against the remaining daily budget.
 4. Accounts for travel time and opening windows.
 5. Fits 3, 4 or 5 stops per day for relaxed, balanced or packed pacing.
 6. Adds a 20-minute buffer between visits.
 7. Reserves ₹400 per day for food and local transport outside listed stop costs.
-8. Returns warnings when requested stops do not fit.
+8. Favors premium dining and activities when a larger budget makes them appropriate.
+9. Returns warnings when requested stops do not fit or the available catalog cannot use a healthy share of the budget.
 
 Travel times are geographic estimates, and map lines are schematic. A production release should replace them with a real routing provider.
 

@@ -7,7 +7,7 @@ Local responsive JavaScript web app + Python API. Pilot: Kochi. Core loop: brows
 React + Vite for a responsive web-first application, FastAPI + SQLite for local durable state. SQLite keeps the local demo self-contained; database access stays on the server. No browser-only substitute for saved trips. Session cookie identifies guest ownership. No production authentication.
 
 ## SLH
-Safety, Legitimacy, Hygiene are separate 1–5 community-review dimensions. Display composite on 100-point scale: (S + L + H) / 15 * 100. Require all dimensions. Missing data means unrated. Show sample count, source status, and review date. Seeded ratings are always labeled demo; no score is a guarantee. Do not fabricate live reviews.
+Safety, Legitimacy, Hygiene are separate 1–5 community-review dimensions. Legitimacy measures scam resistance: a higher L score means a traveler is less likely to encounter misleading listings, hidden charges, impersonation, bait-and-switch tactics or an untrustworthy operator. Display the composite on a 100-point scale: (S + L + H) / 15 * 100. Require all dimensions. Missing data means unrated. Show sample count, source status, and review date. Seeded ratings are always labeled demo; no score is a guarantee. Do not fabricate live reviews.
 
 ## Milestones
 1. Foundation and design skills.
