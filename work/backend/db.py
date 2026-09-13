@@ -1,9 +1,10 @@
 import os
 import sqlite3
-from pathlib import Path
 from contextlib import contextmanager
+from pathlib import Path
 
 DB_PATH = Path(os.environ.get("ROAM_DB_PATH", Path(__file__).with_name("roam.db")))
+
 
 @contextmanager
 def connect():
@@ -15,6 +16,7 @@ def connect():
             yield connection
     finally:
         connection.close()
+
 
 def initialize():
     with connect() as db:
