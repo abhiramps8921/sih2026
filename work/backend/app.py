@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 from . import ai, db
-from .catalog import BY_ID, PLACES, REGIONS, REGION_IDS, TEMPLATE_STOPS
+from .catalog import BY_ID, PLACES, REGION_IDS, REGIONS, TEMPLATE_STOPS
 from .planner import generate_plan
 
 
