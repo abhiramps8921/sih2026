@@ -66,9 +66,7 @@ def test_area_selection_constrains_and_clusters_the_plan():
     )
     assert len(plan["days"]) == 3
     assert all(day["stops"] for day in plan["days"])
-    assert {
-        stop["place"]["area"] for day in plan["days"] for stop in day["stops"]
-    } == {"edappally"}
+    assert {stop["place"]["area"] for day in plan["days"] for stop in day["stops"]} == {"edappally"}
     assert all(day["stops"][0]["travel_mode"] == "start" for day in plan["days"])
 
 
@@ -83,9 +81,7 @@ def test_cross_area_routes_label_local_transit():
         )
     )
     assert any(
-        stop["travel_mode"] == "local transit"
-        for day in plan["days"]
-        for stop in day["stops"]
+        stop["travel_mode"] == "local transit" for day in plan["days"] for stop in day["stops"]
     )
 
 

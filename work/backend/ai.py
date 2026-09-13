@@ -65,8 +65,7 @@ def extract_story(notes):
         ),
         "notes": notes,
         "catalog": [
-            {"id": place["id"], "name": place["name"], "area": place["area"]}
-            for place in PLACES
+            {"id": place["id"], "name": place["name"], "area": place["area"]} for place in PLACES
         ],
     }
     with httpx.Client(timeout=30) as client:
