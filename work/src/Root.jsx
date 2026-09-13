@@ -12,6 +12,7 @@ export default function App() {
   usePlannerTool();
   const [me, setMe] = useState({ saved: [], trips: [], points: 0, badges: [], completed: 0 });
   const [places, setPlaces] = useState([]);
+  const [regions, setRegions] = useState([]);
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
@@ -27,8 +28,13 @@ export default function App() {
     setStatus('loading');
     setError('');
     try {
-      await refresh();
-      setPlaces(await api('/places'));
+      const [, loadedPlaces, loadedRegions] = await Promise.all([
+        refresh(),
+        api('/places'),
+        api('/regions'),
+      ]);
+      setPlaces(loadedPlaces);
+      setRegions(loadedRegions);
       setStatus('ready');
     } catch (e) {
       setError(e.message);
@@ -65,6 +71,7 @@ export default function App() {
       value={{
         me,
         places,
+        regions,
         refresh,
         toggleSave,
         bookmarkBusy,

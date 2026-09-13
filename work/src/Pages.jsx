@@ -288,7 +288,7 @@ export function CreateTrip() {
               required
               autoComplete="off"
               defaultValue={editing?.title || ''}
-              placeholder="Two slow days in Fort Kochi…"
+              placeholder="From Thrippunithura to Marine Drive…"
             />
           </label>
           <label className="field">
@@ -300,7 +300,7 @@ export function CreateTrip() {
               rows="9"
               required
               defaultValue={editing?.notes || ''}
-              placeholder="We started at Chinese Fishing Nets, then walked to Kashi Art Café. Leave time for Mattancherry Palace…"
+              placeholder="We started at Hill Palace, took the metro north, and ended near Changampuzha Park…"
             />
             <small>
               Include place names, approximate timing, costs and local tips. Original notes are
@@ -328,7 +328,8 @@ export function CreateTrip() {
           {!editing && aiEnabled && (
             <label className="ai-choice">
               <input type="checkbox" name="use_ai" />
-              Use AI to structure this story. Your notes will be sent to OpenAI.
+              Use Gemini to structure this story. Your notes and the public place catalog will be
+              sent to Google.
             </label>
           )}
           {editing?.summary && <p className="notice">{editing.summary}</p>}

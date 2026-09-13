@@ -14,17 +14,19 @@ import {
   Landmark,
   Palette,
   Heart,
+  ShoppingBag,
 } from 'lucide-react';
 import { templates, interests, money, slhScore, templateSLH } from './data';
 import { useApp } from './context';
 import { SLHPill } from './components';
 
-const categoryIcons = [Compass, Utensils, Landmark, Leaf, Palette, Sparkles];
+const categoryIcons = [Compass, Utensils, Landmark, Leaf, Palette, Sparkles, ShoppingBag];
 export default function Explore() {
   const [params, setParams] = useSearchParams();
   const active = params.get('interest') || 'All experiences';
+  const activeArea = params.get('area') || '';
   const query = params.get('q') || '';
-  const { me, places, showSLH, toggleSave, bookmarkBusy } = useApp();
+  const { me, places, regions, showSLH, toggleSave, bookmarkBusy } = useApp();
   const saved = me.saved;
   const collection = templates.map((t) => ({
     ...t,
@@ -35,7 +37,10 @@ export default function Explore() {
     (t) =>
       (!params.has('slh') || t.slh >= 90) &&
       (active === 'All experiences' || t.tags.includes(active) || t.category === active) &&
-      `${t.title} ${t.tags.join(' ')}`.toLowerCase().includes(query.toLowerCase()),
+      (!activeArea || t.areas.includes(activeArea)) &&
+      `${t.title} ${t.tags.join(' ')} ${t.areas.join(' ')}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
   );
   const update = (key, value) => {
     const next = new URLSearchParams(params);
@@ -104,6 +109,26 @@ export default function Explore() {
             </button>
           );
         })}
+      </div>
+      <div className="interest-row area-row" aria-label="Filter by Kochi area">
+        <button
+          className={`interest ${!activeArea ? 'selected' : ''}`}
+          aria-pressed={!activeArea}
+          onClick={() => update('area', '')}
+        >
+          All of Kochi
+        </button>
+        {regions.map((region) => (
+          <button
+            key={region.id}
+            className={`interest ${activeArea === region.name ? 'selected' : ''}`}
+            aria-pressed={activeArea === region.name}
+            onClick={() => update('area', region.name)}
+            title={region.character}
+          >
+            {region.name}
+          </button>
+        ))}
       </div>
       <div className="explore-grid">
         <div className="explore-content">
@@ -185,7 +210,7 @@ export default function Explore() {
                     <div className="card-meta">
                       <span>
                         <MapPin size={13} />
-                        Kochi, Kerala
+                        {t.areas.join(' · ')}
                       </span>
                       <SLHPill
                         slh={t.ratings}

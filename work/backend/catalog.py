@@ -1,11 +1,43 @@
-"""Small, explicitly illustrative Kochi catalog; estimates are not live facts."""
+"""Illustrative citywide Kochi catalog; estimates are not live facts."""
 
 
-def place(id, name, category, lat, lng, cost, duration, hours, tip, scores, count=24):
+REGIONS = [
+    {"id": "fort-kochi", "name": "Fort Kochi", "character": "Waterfront heritage and art"},
+    {"id": "mattancherry", "name": "Mattancherry", "character": "Markets and layered history"},
+    {"id": "ernakulam", "name": "Ernakulam & Marine Drive", "character": "Downtown and waterfront"},
+    {"id": "panampilly", "name": "Panampilly Nagar", "character": "Cafés, parks and design"},
+    {"id": "kadavanthra", "name": "Kadavanthra", "character": "Neighbourhood food and city life"},
+    {"id": "edappally", "name": "Edappally", "character": "Shopping, culture and metro access"},
+    {"id": "palarivattom", "name": "Palarivattom & Kaloor", "character": "Markets, food and sport"},
+    {"id": "vyttila", "name": "Vyttila", "character": "Water Metro and mobility hub"},
+    {"id": "thrippunithura", "name": "Thrippunithura", "character": "Royal Kochi and temple heritage"},
+    {"id": "kakkanad", "name": "Kakkanad", "character": "Eastern city and green escapes"},
+    {"id": "kalamassery", "name": "Kalamassery", "character": "Museums and university district"},
+    {"id": "willingdon", "name": "Willingdon Island", "character": "Harbour views"},
+]
+REGION_IDS = {region["id"] for region in REGIONS}
+REGION_NAMES = {region["id"]: region["name"] for region in REGIONS}
+
+_AREA_BY_ID = {
+    "nets": "fort-kochi", "church": "fort-kochi", "kashi": "fort-kochi",
+    "beach": "fort-kochi", "gallery": "fort-kochi", "basilica": "fort-kochi",
+    "theatre": "fort-kochi", "princess": "fort-kochi", "ferry": "fort-kochi",
+    "palace": "mattancherry", "jewtown": "mattancherry", "synagogue": "mattancherry",
+    "cafe": "mattancherry", "market": "mattancherry", "sadya": "mattancherry",
+    "promenade": "ernakulam", "park": "ernakulam", "island": "willingdon",
+}
+
+
+def place(id, name, category, lat, lng, cost, duration, hours, tip, scores, area=None, count=24):
+    area = area or _AREA_BY_ID.get(id)
+    if area not in REGION_IDS:
+        raise ValueError(f"Unknown Kochi area for {id}: {area}")
     return dict(
         id=id,
         name=name,
         category=category,
+        area=area,
+        area_name=REGION_NAMES[area],
         lat=lat,
         lng=lng,
         cost=cost,
@@ -242,6 +274,51 @@ PLACES = [
         "Watch the ferries from public areas. Boat tickets are not included.",
         (4.2, 4.7, 4.0),
     ),
+    place("broadway", "Broadway Market", "Hidden gems", 9.9817, 76.2810, 100, 75,
+          (9, 18), "Go in daylight, keep valuables close, and compare clearly marked prices.",
+          (4.2, 4.6, 4.0), "ernakulam"),
+    place("shiva-temple", "Ernakulam Shiva Temple", "Culture", 9.9703, 76.2797, 0, 45,
+          (5, 20), "Dress respectfully and check current worship-time visitor access.",
+          (4.6, 4.9, 4.5), "ernakulam"),
+    place("panampilly-park", "Panampilly Nagar Central Park", "Nature", 9.9593, 76.2940, 0, 60,
+          (6, 20), "Visit in the cooler morning or evening and use the public paths.",
+          (4.5, 4.6, 4.3), "panampilly"),
+    place("panampilly-walk", "Panampilly Nagar Café Walk", "Food", 9.9612, 76.2928, 450, 90,
+          (10, 21), "A sample neighbourhood walk: choose busy venues with displayed prices.",
+          (4.5, 4.4, 4.5), "panampilly"),
+    place("kadavanthra-market", "Kadavanthra Market Walk", "Hidden gems", 9.9670, 76.2992, 100, 60,
+          (8, 18), "A sample local-market stop; visit by day and ask before photographing vendors.",
+          (4.2, 4.4, 4.1), "kadavanthra"),
+    place("lulu", "Lulu Mall Kochi", "Shopping", 10.0266, 76.3085, 500, 120,
+          (10, 22), "Use the metro at Edappally when practical and check venue hours directly.",
+          (4.7, 4.8, 4.7), "edappally"),
+    place("edappally-church", "St. George Forane Church", "Culture", 10.0277, 76.3071, 0, 45,
+          (6, 20), "Plan around services, dress respectfully, and keep photography discreet.",
+          (4.7, 4.9, 4.6), "edappally"),
+    place("changampuzha", "Changampuzha Park", "Nature", 10.0183, 76.3008, 0, 60,
+          (6, 20), "Check the day's cultural programme and stay on the public park paths.",
+          (4.5, 4.6, 4.4), "edappally"),
+    place("stadium", "Jawaharlal Nehru Stadium Precinct", "Hidden gems", 10.0048, 76.3007, 0, 45,
+          (6, 20), "Use the public exterior spaces; match days can change traffic and access.",
+          (4.3, 4.5, 4.2), "palarivattom"),
+    place("palarivattom-food", "Palarivattom Food Walk", "Food", 10.0027, 76.3062, 400, 90,
+          (11, 21), "A sample food trail: favour busy kitchens and ask about allergens.",
+          (4.3, 4.3, 4.4), "palarivattom"),
+    place("vyttila-water-metro", "Vyttila Water Metro Terminal", "Hidden gems", 9.9665, 76.3214, 50, 45,
+          (7, 19), "Treat this as a transport experience and confirm the live sailing schedule.",
+          (4.5, 4.8, 4.4), "vyttila"),
+    place("hill-palace", "Hill Palace Museum", "Culture", 9.9527, 76.3639, 100, 120,
+          (9, 17), "Allow time for the grounds and verify the weekly closure before travelling.",
+          (4.6, 4.9, 4.5), "thrippunithura"),
+    place("poornathrayeesa", "Sree Poornathrayeesa Temple", "Culture", 9.9497, 76.3438, 0, 60,
+          (5, 20), "Check visitor access and dress rules; festival days can be especially busy.",
+          (4.6, 4.9, 4.5), "thrippunithura"),
+    place("kadambrayar", "Kadambrayar Riverside", "Nature", 10.0046, 76.3734, 100, 90,
+          (7, 18), "Visit in daylight, check weather, and use established public activity areas.",
+          (4.2, 4.4, 4.1), "kakkanad"),
+    place("kerala-museum", "Museum of Kerala History", "Art", 10.0459, 76.3171, 200, 90,
+          (10, 17), "Confirm current opening days and exhibition access before taking the metro.",
+          (4.6, 4.8, 4.5), "kalamassery"),
 ]
 BY_ID = {p["id"]: p for p in PLACES}
 TEMPLATE_STOPS = {
@@ -268,6 +345,10 @@ TEMPLATE_STOPS = {
         "market",
         "sadya",
     ],
+    "royal-kochi": ["hill-palace", "poornathrayeesa", "panampilly-park"],
+    "city-and-style": ["broadway", "promenade", "shiva-temple", "panampilly-walk", "panampilly-park"],
+    "north-kochi": ["kerala-museum", "changampuzha", "edappally-church", "lulu"],
+    "water-and-green": ["vyttila-water-metro", "kadambrayar", "panampilly-park"],
 }
 
 

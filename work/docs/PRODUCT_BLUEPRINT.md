@@ -73,7 +73,7 @@ AI is limited to extracting mentioned catalog places, a short summary and unreso
 - FastAPI backend with validated request models.
 - SQLite for local durable state.
 - Leaflet and OpenStreetMap for map display.
-- Optional OpenAI Responses API integration on the backend.
+- Optional Google Gemini Interactions API integration on the backend.
 - GitHub Actions for frontend build, formatting and backend/frontend tests.
 
 The frontend never receives service credentials. All persistent mutations pass through backend ownership checks. Completion records use a unique trip-and-stop key so retries cannot award points twice.

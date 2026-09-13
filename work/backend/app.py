@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 from . import ai, db
-from .catalog import BY_ID, PLACES, TEMPLATE_STOPS
+from .catalog import BY_ID, PLACES, REGIONS, REGION_IDS, TEMPLATE_STOPS
 from .planner import generate_plan
 
 
@@ -61,9 +61,10 @@ async def guest_session(request: Request, call_next):
 class Preferences(BaseModel):
     days: int = Field(default=2, ge=1, le=3)
     budget: int = Field(default=1500, ge=500, le=20000)
-    interests: list[Literal["Food", "Culture", "Nature", "Art", "Hidden gems"]] = Field(
-        default_factory=lambda: ["Culture", "Food"], max_length=5
+    interests: list[Literal["Food", "Culture", "Nature", "Art", "Hidden gems", "Shopping"]] = Field(
+        default_factory=lambda: ["Culture", "Food"], max_length=6
     )
+    areas: list[str] = Field(default_factory=list, max_length=12)
     pace: Literal["relaxed", "balanced", "packed"] = "balanced"
     start_date: date = Field(default_factory=date.today)
     min_slh: int = Field(default=0, ge=0, le=100)
@@ -76,6 +77,13 @@ class Preferences(BaseModel):
         if value.year > 2100 or value.year < 2020:
             raise ValueError("Choose a trip date between 2020 and 2100.")
         return value
+
+    @field_validator("areas")
+    @classmethod
+    def known_areas(cls, value):
+        if any(area not in REGION_IDS for area in value):
+            raise ValueError("Choose areas from the supported Kochi region list.")
+        return list(dict.fromkeys(value))
 
 
 class Completion(BaseModel):
@@ -95,7 +103,7 @@ class DraftInput(BaseModel):
 class DraftUpdate(BaseModel):
     title: str = Field(min_length=3, max_length=100)
     notes: str = Field(min_length=20, max_length=10000)
-    place_ids: list[str] = Field(max_length=18)
+    place_ids: list[str] = Field(max_length=len(PLACES))
 
 
 class EditTrip(BaseModel):
@@ -120,6 +128,10 @@ def load_trip(connection, trip_id, owner):
     }
     for day in plan["days"]:
         for stop in day["stops"]:
+            current_place = BY_ID.get(stop["place"]["id"])
+            if current_place:
+                stop["place"] = {**current_place, **stop["place"]}
+            stop.setdefault("travel_mode", "walk")
             stop["completed"] = stop["id"] in completed
     plan["id"] = trip_id
     return plan
@@ -137,7 +149,17 @@ def places():
 
 @app.get("/api/config")
 def config():
-    return {"ai_enabled": ai.enabled(), "city": "Kochi", "social_mode": "demo"}
+    return {
+        "ai_enabled": ai.enabled(),
+        "ai_provider": "Gemini",
+        "city": "Kochi",
+        "social_mode": "demo",
+    }
+
+
+@app.get("/api/regions")
+def regions():
+    return REGIONS
 
 
 @app.get("/api/me")

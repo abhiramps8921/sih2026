@@ -348,6 +348,10 @@ h1 span {
   margin: 22px 0 28px;
   overflow-x: auto;
   padding: 2px 2px 7px;
+  scrollbar-width: none;
+}
+.interest-row::-webkit-scrollbar {
+  display: none;
 }
 .interest {
   display: flex;

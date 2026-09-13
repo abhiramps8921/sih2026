@@ -4,15 +4,15 @@ A responsive Kochi travel app with a React/JavaScript interface, Python/FastAPI 
 
 ## What works
 
-- Browse and search four seeded itinerary collections; filter by interests or aggregate SLH.
+- Browse and search eight seeded itinerary collections across twelve Kochi hubs; filter by area, interests or aggregate SLH.
 - Save collections to your guest session.
-- Generate and save 1–3 day trips with budget, interests, pace, dates, opening-window constraints, travel estimates and buffers.
-- View day timelines and OpenStreetMap pins; launch external walking directions.
+- Generate and save 1–3 day trips with selected Kochi areas, budget, interests, pace, dates, opening-window constraints, clustered travel estimates and buffers.
+- View day timelines and OpenStreetMap pins; launch external walking or transit directions.
 - Replace or remove stops and recalculate schedule and costs before starting progress.
 - Mark stops complete, undo mistakes, persist progress, earn points and badges without duplicate rewards.
 - Inspect Safety, Legitimacy and Hygiene scores, dimensions, review count, date and methodology. Trip scores derive from their stops.
 - Save travel stories, review catalog-matched places, edit drafts and turn them into scheduled trips.
-- Opt into optional AI extraction when a backend OpenAI key is configured; failures preserve the original story with an explicitly labeled fallback.
+- Opt into optional Gemini extraction when a backend Google AI key is configured; failures preserve the original story with an explicitly labeled fallback.
 - Try persistent, explicitly demo-only group join/withdraw requests.
 - Keyboard-friendly controls, focus-managed SLH dialogs, responsive layouts and reduced-motion styles.
 
@@ -43,15 +43,15 @@ On macOS/Linux use `.venv/bin/python` instead. The combined start script handles
 
 ## Optional AI
 
-Copy `work/.env.example` to `work/.env`, fill `OPENAI_API_KEY` locally and optionally set `OPENAI_MODEL`. The combined start command loads this file. For separate terminals, export these variables in the Python terminal. Restart the backend after changes.
+Copy `work/.env.example` to `work/.env`, fill `GEMINI_API_KEY` locally and optionally set `GEMINI_MODEL`. The combined start command loads this file. For separate terminals, export these variables in the Python terminal. Restart the backend after changes.
 
-The contribution form then offers an explicit opt-in checkbox. Only submitted story text and the public place catalog are sent to OpenAI. Keys never reach the frontend. The adapter uses the [Responses API structured-output format](https://developers.openai.com/api/docs/guides/structured-outputs), validates returned IDs against the catalog, does not request API response storage, and retains a local fallback. A live paid API request has not been exercised in this build.
+The contribution form then offers an explicit opt-in checkbox. Only submitted story text and the public place catalog are sent to Google. Keys never reach the frontend. The adapter uses the [Gemini Interactions API structured-output format](https://ai.google.dev/gemini-api/docs/structured-output?lang=rest), validates returned IDs against the catalog and retains a local fallback. A live paid API request has not been exercised in this build.
 
 ## Data and scope
 
 `work/backend/roam.db` is created on first start and excluded from Git. Guest ownership is based on an HttpOnly, SameSite cookie; clearing that cookie loses access to that session’s data. This is a local pilot, not production authentication. Keep the server bound to loopback.
 
-The venue hours, costs, review counts, SLH ratings and contributor identities are **sample data**, not live or verified information. Some meal stops represent suggested experiences rather than verified businesses. Routes are approximate walking estimates with schematic connecting lines, not road routing. Food and local transport have a separate ₹400 daily allowance. Stay and travel to Kochi are excluded.
+The venue hours, costs, review counts, SLH ratings and contributor identities are **sample data**, not live or verified information. Some meal stops represent suggested experiences rather than verified businesses. Routes are approximate walking or local-transit estimates with schematic connecting lines, not road routing. Food and local transport have a separate ₹400 daily allowance. Stay and travel to Kochi are excluded.
 
 SLH = `(Safety + Legitimacy + Hygiene) / 15 × 100`, with each dimension rated 1–5. Missing or invalid dimensions result in no rating. An itinerary’s score averages its stop dimensions equally. No score certifies safety. No actual reviews are collected yet.
 

@@ -44,7 +44,7 @@ export default function TripMap({ stops }) {
       <p>
         {tilesFailed
           ? 'Map tiles unavailable. Stops are listed in the timeline.'
-          : 'OpenStreetMap · Dashed lines connect stops; they are not walking directions.'}
+          : 'OpenStreetMap · Dashed lines connect stops; they are not road directions.'}
       </p>
     </section>
   );

@@ -38,12 +38,13 @@ const dateLabel = (value) =>
 export function Planner() {
   const [params] = useSearchParams();
   const template = templates.find((t) => t.id === params.get('template'));
-  const { refresh } = useApp();
+  const { refresh, regions } = useApp();
   const navigate = useNavigate();
   const [tags, setTags] = useState(
     template?.tags.filter((t) => t !== 'Hidden gems') || ['Culture', 'Food'],
   );
   const [pace, setPace] = useState('balanced');
+  const [areas, setAreas] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function generate(e) {
@@ -57,6 +58,7 @@ export function Planner() {
         budget: Number(form.get('budget')),
         start_date: form.get('date'),
         interests: tags,
+        areas,
         pace,
         min_slh: Number(form.get('slh')),
         template_id: template?.id || null,
@@ -95,6 +97,30 @@ export function Planner() {
             </div>
             <span className="tag">Pilot city</span>
           </div>
+          <fieldset className="tag-fieldset">
+            <legend>Which parts of Kochi?</legend>
+            <p className="field-hint">Leave all unselected for a citywide plan.</p>
+            <div className="tag-options">
+              {regions.map((region) => (
+                <button
+                  key={region.id}
+                  type="button"
+                  aria-pressed={areas.includes(region.id)}
+                  className={`interest ${areas.includes(region.id) ? 'selected' : ''}`}
+                  onClick={() =>
+                    setAreas((previous) =>
+                      previous.includes(region.id)
+                        ? previous.filter((id) => id !== region.id)
+                        : [...previous, region.id],
+                    )
+                  }
+                  title={region.character}
+                >
+                  {areas.includes(region.id) && <Check size={15} />} {region.name}
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <label className="field">
             Give your trip a name
             <input
@@ -152,7 +178,7 @@ export function Planner() {
           <fieldset className="tag-fieldset">
             <legend>What draws you in?</legend>
             <div className="tag-options">
-              {['Food', 'Culture', 'Nature', 'Art', 'Hidden gems'].map((t) => (
+              {['Food', 'Culture', 'Nature', 'Art', 'Hidden gems', 'Shopping'].map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -242,8 +268,8 @@ export function Planner() {
               </li>
             </ul>
             <p className="notice">
-              This pilot uses a rule-based planner and sample venue information. Walking times are
-              estimates; check opening hours locally.
+              This pilot uses a rule-based planner and sample venue information. Walking and local
+              transit times are estimates; check opening hours locally.
             </p>
           </div>
         </aside>
@@ -631,7 +657,7 @@ export function ActiveTrip() {
             <h2>
               {dayIndex === 0 ? 'Let the wandering begin.' : 'Another day, another discovery.'}
             </h2>
-            <p>{money(day.cost)} estimated · Walking pace · 20-minute breaks</p>
+            <p>{money(day.cost)} estimated · Area-clustered route · 20-minute breaks</p>
           </div>
           <div className="timeline">
             {day.stops.map((stop, i) => (
@@ -653,7 +679,10 @@ export function ActiveTrip() {
                     </span>
                     <span>{money(stop.place.cost)}</span>
                     <span>
-                      <Footprints size={14} />~{stop.travel_minutes} min to get here
+                      <Footprints size={14} />
+                      {stop.travel_mode === 'start'
+                        ? `Start in ${stop.place.area_name}`
+                        : `~${stop.travel_minutes} min by ${stop.travel_mode}`}
                     </span>
                   </div>
                   {done === 0 && (
@@ -679,7 +708,7 @@ export function ActiveTrip() {
                     </button>
                     <a
                       className="navigation-link"
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${stop.place.lat},${stop.place.lng}&travelmode=walking`}
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${stop.place.lat},${stop.place.lng}&travelmode=${stop.travel_mode === 'local transit' ? 'transit' : 'walking'}`}
                       target="_blank"
                       rel="noreferrer"
                     >
