@@ -2,10 +2,13 @@ import json
 import secrets
 from contextlib import asynccontextmanager
 from datetime import date
+from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 from . import ai, db
@@ -20,6 +23,17 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Roam local travel API", lifespan=lifespan)
+FRONTEND_DIST = Path(__file__).resolve().parents[1] / "dist"
+
+
+def is_same_host_origin(origin: str | None, host: str) -> bool:
+    if not origin:
+        return False
+    try:
+        parsed = urlsplit(origin)
+    except ValueError:
+        return False
+    return parsed.scheme in {"http", "https"} and parsed.netloc.lower() == host.lower()
 
 
 @app.middleware("http")
@@ -31,11 +45,10 @@ async def guest_session(request: Request, call_next):
             "http://localhost:5173",
             "http://127.0.0.1:8000",
         }
-        if origin and origin not in allowed:
-            from starlette.responses import JSONResponse
-
+        same_host = is_same_host_origin(origin, request.headers.get("host", ""))
+        if origin and origin not in allowed and not same_host:
             return JSONResponse(
-                {"detail": "This local app only accepts same-site changes."},
+                {"detail": "This app only accepts same-site changes."},
                 status_code=403,
             )
     session = request.cookies.get("roam_session", "")
@@ -486,3 +499,20 @@ def join_group(group_id: str, change: BookmarkChange, request: Request):
                 (request.state.owner, group_id),
             )
     return {"status": "pending" if change.saved else None, "demo": True}
+
+
+@app.get("/{path:path}", include_in_schema=False)
+def frontend(path: str):
+    """Serve the Vite production build and preserve client-side routes."""
+    if path.startswith("api/") or not FRONTEND_DIST.is_dir():
+        raise HTTPException(404, "Not found.")
+
+    root = FRONTEND_DIST.resolve()
+    requested = (root / path).resolve()
+    if requested.is_relative_to(root) and requested.is_file():
+        return FileResponse(requested)
+
+    index = root / "index.html"
+    if index.is_file():
+        return FileResponse(index)
+    raise HTTPException(404, "Frontend build not found.")

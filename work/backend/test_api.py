@@ -26,6 +26,41 @@ def create_trip(client, **overrides):
     return response.json()
 
 
+def test_same_origin_production_mutation_is_allowed(client):
+    response = client.put(
+        "/api/bookmarks/slow-kochi",
+        json={"saved": True},
+        headers={
+            "Origin": "https://roam-kochi.onrender.com",
+            "Host": "roam-kochi.onrender.com",
+        },
+    )
+    assert response.status_code == 200
+
+
+def test_cross_origin_mutation_is_rejected(client):
+    response = client.put(
+        "/api/bookmarks/slow-kochi",
+        json={"saved": True},
+        headers={"Origin": "https://malicious.example"},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize("origin", ["http://[invalid", "ftp://testserver"])
+def test_invalid_origin_is_rejected(client, origin):
+    response = client.put(
+        "/api/bookmarks/slow-kochi",
+        json={"saved": True},
+        headers={"Origin": origin},
+    )
+    assert response.status_code == 403
+
+
+def test_unknown_api_route_is_not_masked_by_frontend(client):
+    assert client.get("/api/does-not-exist").status_code == 404
+
+
 @pytest.mark.parametrize("days", [1, 2, 3])
 @pytest.mark.parametrize("budget", [500, 1500, 5000])
 @pytest.mark.parametrize("pace", ["relaxed", "balanced", "packed"])

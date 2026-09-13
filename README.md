@@ -47,9 +47,17 @@ Copy `work/.env.example` to `work/.env`, fill `GEMINI_API_KEY` locally and optio
 
 The contribution form then offers an explicit opt-in checkbox. Only submitted story text and the public place catalog are sent to Google. Keys never reach the frontend. The adapter uses the [Gemini Interactions API structured-output format](https://ai.google.dev/gemini-api/docs/structured-output?lang=rest), validates returned IDs against the catalog and retains a local fallback. A live paid API request has not been exercised in this build.
 
+## Deploy on Render
+
+The root `render.yaml` and multi-stage `Dockerfile` deploy the React build and FastAPI API as one same-origin web service. Open the [Render Blueprint](https://dashboard.render.com/blueprint/new?repo=https://github.com/abhiramps8921/sih2026), connect the repository and apply the `roam-kochi` service. The health check is `/api/health`.
+
+The app works without an AI key using its seeded catalog and deterministic planner. To enable story extraction, add `GEMINI_API_KEY` in the Render service's Environment page; `GEMINI_MODEL` is optional.
+
+The free Render service stores SQLite data on an ephemeral filesystem, so guest trips, drafts and progress can reset after a restart or deploy. A durable production setup should attach a persistent disk on a paid instance or move the same data model to a managed database.
+
 ## Data and scope
 
-`work/backend/roam.db` is created on first start and excluded from Git. Guest ownership is based on an HttpOnly, SameSite cookie; clearing that cookie loses access to that session’s data. This is a local pilot, not production authentication. Keep the server bound to loopback.
+`work/backend/roam.db` is created on first start and excluded from Git. Guest ownership is based on an HttpOnly, SameSite cookie; clearing that cookie loses access to that session’s data. This is pilot-grade guest isolation rather than production authentication. Bind manual development servers to loopback; the Render image exposes only the public application port.
 
 The venue hours, costs, review counts, SLH ratings and contributor identities are **sample data**, not live or verified information. Some meal stops represent suggested experiences rather than verified businesses. Routes are approximate walking or local-transit estimates with schematic connecting lines, not road routing. Food and local transport have a separate ₹400 daily allowance. Stay and travel to Kochi are excluded.
 
