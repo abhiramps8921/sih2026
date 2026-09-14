@@ -443,8 +443,8 @@ export function Profile() {
       <section className="profile-panel">
         <span className="profile-avatar large">Y</span>
         <div>
-          <h2>A curious traveler</h2>
-          <p>Guest explorer · This browser’s local session</p>
+          <h2>{me.user.email}</h2>
+          <p>{me.user.role === 'local' ? 'Local' : 'Tourist'} · Your Roam account</p>
         </div>
         <Link className="button" to="/create">
           <Plus size={17} />
@@ -495,8 +495,7 @@ export function Profile() {
       </div>
       <p className="notice">
         10 points per stop, plus 25 points per completed day. Completion is self-reported. Undoing a
-        stop updates your points and badges. Guest data is tied to this browser cookie; this is not
-        an authenticated profile.
+        stop updates your points and badges. Your progress is saved to your account.
       </p>
     </main>
   );

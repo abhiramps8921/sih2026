@@ -5,7 +5,8 @@ A responsive Kochi travel app with a React/JavaScript interface, Python/FastAPI 
 ## What works
 
 - Browse and search eight seeded itinerary collections across twelve Kochi hubs; filter by area, interests or aggregate SLH.
-- Save collections to your guest session.
+- Create an account with email and password, log in, then choose tourist or local. Passwords are stored as salted scrypt hashes; repeat logins require the original password.
+- Save collections and trip progress to your account across logins and browsers.
 - Generate and save 1–3 day trips with selected Kochi areas, budget, interests, pace, dates, opening-window constraints, clustered travel estimates and budget utilization.
 - View day timelines and OpenStreetMap pins; launch external walking or transit directions.
 - Replace or remove stops and recalculate schedule and costs before starting progress.
@@ -53,11 +54,11 @@ The root `render.yaml` and multi-stage `Dockerfile` deploy the React build and F
 
 The app works without an AI key using its seeded catalog and deterministic planner. To enable story extraction, add `GEMINI_API_KEY` in the Render service's Environment page; `GEMINI_MODEL` is optional.
 
-The free Render service stores SQLite data on an ephemeral filesystem, so guest trips, drafts and progress can reset after a restart or deploy. A durable production setup should attach a persistent disk on a paid instance or move the same data model to a managed database.
+The free Render service stores SQLite data on an ephemeral filesystem, so accounts, trips, drafts and progress can reset after a restart or deploy. For durable accounts, attach a persistent disk on a paid instance and set `ROAM_DB_PATH` to a file on that disk, or move the data model to a managed database.
 
 ## Data and scope
 
-`work/backend/roam.db` is created on first start and excluded from Git. Guest ownership is based on an HttpOnly, SameSite cookie; clearing that cookie loses access to that session’s data. This is pilot-grade guest isolation rather than production authentication. Bind manual development servers to loopback; the Render image exposes only the public application port.
+`work/backend/roam.db` is created on first start and excluded from Git. Account ownership is resolved through an HttpOnly, SameSite session cookie with a 30-day server-side expiry; logout revokes it. Email addresses are normalized and unique. The tourist/local choice is stored in the database and requested after each login. Authentication attempts are limited per email and client IP. Email verification and password reset are not included. Existing guest API sessions remain isolated and are not automatically transferred to new accounts. Bind manual development servers to loopback; the Render image exposes only the public application port.
 
 The venue hours, costs, review counts, SLH ratings and contributor identities are **sample data**, not live or verified information. Some meal stops represent suggested experiences rather than verified businesses. Routes are approximate walking or local-transit estimates with schematic connecting lines, not road routing. Food and local transport have a separate ₹400 daily allowance. Stay and travel to Kochi are excluded.
 

@@ -22,6 +22,9 @@ def initialize():
     with connect() as db:
         db.executescript("""
         CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY);
+        CREATE TABLE IF NOT EXISTS accounts (id TEXT PRIMARY KEY REFERENCES sessions(id), email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT CHECK(role IN ('tourist','local')));
+        CREATE TABLE IF NOT EXISTS account_sessions (token_hash TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id), expires_at INTEGER NOT NULL, role_selected INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS auth_attempts (key TEXT PRIMARY KEY, attempts INTEGER NOT NULL, reset_at INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS trips (id TEXT PRIMARY KEY, owner TEXT NOT NULL REFERENCES sessions(id), plan TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
         CREATE INDEX IF NOT EXISTS trips_owner ON trips(owner);
         CREATE TABLE IF NOT EXISTS completions (trip TEXT NOT NULL REFERENCES trips(id), stop TEXT NOT NULL, PRIMARY KEY(trip,stop));

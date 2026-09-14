@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, NavLink, Routes, Route, useLocation } from 'react-router-dom';
 import { Compass, Map, Users, Plus, Footprints, LoaderCircle } from 'lucide-react';
 import Explore from './Explore';
+import Auth from './Auth';
 import { api, send } from './api';
 import { AppContext } from './context';
 import { SLHDetails } from './components';
@@ -18,6 +19,7 @@ export default function App() {
   const [toast, setToast] = useState('');
   const [slhPlace, setSlhPlace] = useState(null);
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const location = useLocation();
   async function refresh() {
     const profile = await api('/me');
@@ -66,6 +68,18 @@ export default function App() {
       setBookmarkBusy(false);
     }
   }
+  async function logout() {
+    setLogoutBusy(true);
+    try {
+      await send('/auth/logout', 'POST', {});
+      setSlhPlace(null);
+      await load();
+    } catch (e) {
+      setToast(e.message);
+    } finally {
+      setLogoutBusy(false);
+    }
+  }
   return (
     <AppContext.Provider
       value={{
@@ -90,28 +104,39 @@ export default function App() {
             </span>
             roam<span className="brand-dot">.</span>
           </Link>
-          <nav aria-label="Main navigation">
-            <NavLink to="/" end>
-              <Compass size={18} />
-              Explore
-            </NavLink>
-            <NavLink to="/trips">
-              <Map size={18} />
-              My trips
-            </NavLink>
-            <NavLink to="/community">
-              <Users size={18} />
-              Community
-            </NavLink>
-          </nav>
+          {me.user?.role_selected && (
+            <nav aria-label="Main navigation">
+              <NavLink to="/" end>
+                <Compass size={18} />
+                Explore
+              </NavLink>
+              <NavLink to="/trips">
+                <Map size={18} />
+                My trips
+              </NavLink>
+              <NavLink to="/community">
+                <Users size={18} />
+                Community
+              </NavLink>
+            </nav>
+          )}
           <div className="header-actions">
-            <Link className="text-button share-link" to="/create">
-              <Plus size={17} />
-              Share a trip
-            </Link>
-            <Link className="profile-avatar" to="/profile" aria-label="Your profile">
-              Y
-            </Link>
+            {me.user?.role_selected && (
+              <Link className="text-button share-link" to="/create">
+                <Plus size={17} />
+                Share a trip
+              </Link>
+            )}
+            {me.user?.role_selected && (
+              <Link className="profile-avatar" to="/profile" aria-label="Your profile">
+                Y
+              </Link>
+            )}
+            {me.user && (
+              <button className="text-button" onClick={logout} disabled={logoutBusy}>
+                {logoutBusy ? 'Logging out…' : 'Log out'}
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -132,6 +157,8 @@ export default function App() {
             </button>
           </div>
         </main>
+      ) : !me.user || !me.user.role_selected ? (
+        <Auth user={me.user} refresh={refresh} />
       ) : (
         <Routes>
           <Route path="/" element={<Explore />} />

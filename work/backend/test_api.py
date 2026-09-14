@@ -385,3 +385,89 @@ def test_extreme_dates_are_validation_errors(client):
     assert (
         client.post("/api/trips", json={"start_date": "9999-12-31", "days": 3}).status_code == 422
     )
+
+
+def test_account_login_role_and_persistence(client):
+    credentials = {"email": "Traveler@Example.com", "password": "my-secret-password"}
+    response = client.post("/api/auth/signup", json=credentials)
+    assert response.status_code == 201
+    assert "HttpOnly" in response.headers["set-cookie"]
+    assert client.get("/api/me").json()["user"]["role_selected"] == 0
+    assert client.put("/api/auth/role", json={"role": "tourist"}).status_code == 200
+    trip = create_trip(client)
+    old_token = client.cookies.get("roam_auth")
+    with db.connect() as connection:
+        account = connection.execute("SELECT * FROM accounts").fetchone()
+        assert account["email"] == "traveler@example.com"
+        assert credentials["password"] not in account["password_hash"]
+        assert account["role"] == "tourist"
+    assert client.post("/api/auth/logout").status_code == 200
+    assert client.get("/api/me").json()["user"] is None
+    assert client.get(f"/api/trips/{trip['id']}").status_code == 404
+    client.cookies.set("roam_auth", old_token)
+    assert client.get("/api/me").json()["user"] is None
+    client.cookies.clear()
+    wrong = {**credentials, "password": "wrong-password"}
+    assert client.post("/api/auth/login", json=wrong).status_code == 401
+    assert client.get("/api/me").json()["user"] is None
+    assert client.post("/api/auth/login", json=credentials).status_code == 200
+    profile = client.get("/api/me").json()
+    assert profile["user"]["role_selected"] == 0
+    assert profile["trips"][0]["id"] == trip["id"]
+    assert client.put("/api/auth/role", json={"role": "local"}).status_code == 200
+    assert client.get("/api/me").json()["user"]["role"] == "local"
+    client.cookies.clear()
+    assert (
+        client.post(
+            "/api/auth/signup", json={**credentials, "email": "other@example.com"}
+        ).status_code
+        == 201
+    )
+    assert client.get(f"/api/trips/{trip['id']}").status_code == 404
+
+
+def test_account_validation_and_expiry(client):
+    credentials = {"email": "person@example.com", "password": "long-password"}
+    assert client.put("/api/auth/role", json={"role": "local"}).status_code == 401
+    assert client.post("/api/auth/signup", json={**credentials, "email": "bad"}).status_code == 422
+    assert (
+        client.post("/api/auth/signup", json={**credentials, "password": "short"}).status_code
+        == 422
+    )
+    assert client.post("/api/auth/signup", json=credentials).status_code == 201
+    assert (
+        client.post(
+            "/api/auth/signup", json={**credentials, "email": "PERSON@example.com"}
+        ).status_code
+        == 409
+    )
+    assert client.put("/api/auth/role", json={"role": "admin"}).status_code == 422
+    with db.connect() as connection:
+        connection.execute("UPDATE account_sessions SET expires_at=0")
+    assert client.get("/api/me").json()["user"] is None
+    assert client.put("/api/auth/role", json={"role": "local"}).status_code == 401
+
+
+def test_login_attempts_are_limited(client):
+    for _ in range(10):
+        assert (
+            client.post(
+                "/api/auth/login",
+                json={"email": "missing@example.com", "password": "incorrect-password"},
+            ).status_code
+            == 401
+        )
+    assert (
+        client.post(
+            "/api/auth/login",
+            json={"email": "missing@example.com", "password": "incorrect-password"},
+        ).status_code
+        == 429
+    )
+
+
+def test_successful_login_does_not_exhaust_email_attempts(client):
+    credentials = {"email": "returning@example.com", "password": "long-password"}
+    assert client.post("/api/auth/signup", json=credentials).status_code == 201
+    for _ in range(11):
+        assert client.post("/api/auth/login", json=credentials).status_code == 200

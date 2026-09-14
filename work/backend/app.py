@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-from . import ai, db
+from . import ai, auth, db
 from .catalog import BY_ID, PLACES, REGION_IDS, REGIONS, TEMPLATE_STOPS
 from .planner import generate_plan
 
@@ -23,6 +23,7 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Roam local travel API", lifespan=lifespan)
+app.include_router(auth.router)
 FRONTEND_DIST = Path(__file__).resolve().parents[1] / "dist"
 
 
@@ -57,7 +58,8 @@ async def guest_session(request: Request, call_next):
         if not exists:
             session = secrets.token_urlsafe(32)
             connection.execute("INSERT INTO sessions(id) VALUES (?)", (session,))
-    request.state.owner = session
+    request.state.user = auth.resolve_user(request)
+    request.state.owner = request.state.user["id"] if request.state.user else session
     response = await call_next(request)
     if not exists:
         response.set_cookie(
@@ -204,6 +206,7 @@ def me(request: Request):
             )
         ]
         return dict(
+            user=request.state.user,
             points=count * 10 + completed_days * 25,
             completed=count,
             badges=badges,
