@@ -148,9 +148,7 @@ def unique_venue_ids(place_ids):
 def visited_place_ids(connection, owner):
     return {
         row["place"]
-        for row in connection.execute(
-            "SELECT place FROM visited_places WHERE owner=?", (owner,)
-        )
+        for row in connection.execute("SELECT place FROM visited_places WHERE owner=?", (owner,))
     }
 
 
@@ -186,9 +184,7 @@ def load_trip(connection, trip_id, owner):
             allow_ai=False,
         )
         repaired_keys = [
-            venue_key(stop["place"])
-            for day in repaired["days"]
-            for stop in day["stops"]
+            venue_key(stop["place"]) for day in repaired["days"] for stop in day["stops"]
         ]
         if len(repaired_keys) != len(set(repaired_keys)):
             raise RuntimeError("Planner returned duplicate venues while repairing a saved trip")
@@ -519,9 +515,7 @@ def schedule_draft(payload: DraftTrip, request: Request):
                 if preferences.include_visited
                 else visited_place_ids(connection, request.state.owner)
             )
-            plan = generate_plan(
-                preferences, excluded=excluded, requested=content["place_ids"]
-            )
+            plan = generate_plan(preferences, excluded=excluded, requested=content["place_ids"])
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
         plan["source_draft"] = payload.draft_id

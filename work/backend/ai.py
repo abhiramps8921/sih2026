@@ -79,7 +79,9 @@ def _request_json(prompt, schema):
     """Call Gemini once and convert every provider failure into one safe exception."""
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        logger.warning("Gemini unavailable: API key is not configured. Falling back to local recommendation engine.")
+        logger.warning(
+            "Gemini unavailable: API key is not configured. Falling back to local recommendation engine."
+        )
         raise GeminiUnavailableError("Gemini API key is not configured")
     try:
         with httpx.Client(timeout=httpx.Timeout(12.0, connect=5.0)) as client:
@@ -89,7 +91,11 @@ def _request_json(prompt, schema):
                 json={
                     "model": os.environ.get("GEMINI_MODEL", "gemini-3.8-flash"),
                     "input": json.dumps(prompt, ensure_ascii=False),
-                    "response_format": {"type": "text", "mime_type": "application/json", "schema": schema},
+                    "response_format": {
+                        "type": "text",
+                        "mime_type": "application/json",
+                        "schema": schema,
+                    },
                 },
             )
             response.raise_for_status()
@@ -105,7 +111,9 @@ def _request_json(prompt, schema):
         raise GeminiUnavailableError("Gemini could not provide a usable response") from exc
     except Exception as exc:
         # Provider/client changes must never stop itinerary creation.
-        logger.exception("Gemini unavailable due to an unexpected error. Falling back to local recommendation engine.")
+        logger.exception(
+            "Gemini unavailable due to an unexpected error. Falling back to local recommendation engine."
+        )
         raise GeminiUnavailableError("Gemini could not provide a usable response") from exc
 
 
@@ -116,11 +124,15 @@ def generate_candidates(preferences):
         "traveller_preferences": preferences.model_dump(mode="json"),
     }
     try:
-        return CandidateList.model_validate_json(_request_json(prompt, _candidate_schema())).candidates
+        return CandidateList.model_validate_json(
+            _request_json(prompt, _candidate_schema())
+        ).candidates
     except (GeminiUnavailableError, ValueError) as exc:
         if isinstance(exc, GeminiUnavailableError):
             raise
-        logger.warning("Gemini candidate JSON was invalid. Falling back to local recommendation engine.")
+        logger.warning(
+            "Gemini candidate JSON was invalid. Falling back to local recommendation engine."
+        )
         raise GeminiUnavailableError("Gemini returned invalid candidate JSON") from exc
 
 
@@ -136,7 +148,9 @@ def rerank_places(preferences, places):
     except (GeminiUnavailableError, ValueError) as exc:
         if isinstance(exc, GeminiUnavailableError):
             raise
-        logger.warning("Gemini ranking JSON was invalid. Falling back to local recommendation engine.")
+        logger.warning(
+            "Gemini ranking JSON was invalid. Falling back to local recommendation engine."
+        )
         raise GeminiUnavailableError("Gemini returned invalid ranking JSON") from exc
     allowed = {place["id"] for place in places}
     ids = list(dict.fromkeys(place_id for place_id in ranked.place_ids if place_id in allowed))
@@ -147,18 +161,71 @@ def rerank_places(preferences, places):
 
 def _candidate_schema():
     return {
-        "type": "object", "properties": {"candidates": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "category": {"type": "string"}, "reason": {"type": "string"}}, "required": ["name", "category", "reason"], "additionalProperties": False}, "minItems": 1, "maxItems": 20}},
-        "required": ["candidates"], "additionalProperties": False,
+        "type": "object",
+        "properties": {
+            "candidates": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "category": {"type": "string"},
+                        "reason": {"type": "string"},
+                    },
+                    "required": ["name", "category", "reason"],
+                    "additionalProperties": False,
+                },
+                "minItems": 1,
+                "maxItems": 20,
+            }
+        },
+        "required": ["candidates"],
+        "additionalProperties": False,
     }
 
 
 def _rank_schema():
-    return {"type": "object", "properties": {"place_ids": {"type": "array", "items": {"type": "string", "enum": list(BY_ID)}, "minItems": 1, "maxItems": len(PLACES)}}, "required": ["place_ids"], "additionalProperties": False}
+    return {
+        "type": "object",
+        "properties": {
+            "place_ids": {
+                "type": "array",
+                "items": {"type": "string", "enum": list(BY_ID)},
+                "minItems": 1,
+                "maxItems": len(PLACES),
+            }
+        },
+        "required": ["place_ids"],
+        "additionalProperties": False,
+    }
 
 
 def _local_place_summary(place):
     """Only send fields actually present in the catalog; omitted fields are unknown."""
-    keys = ("id", "name", "category", "tags", "local_rating", "tourist_rating", "worth_it_score", "price_level", "cost", "estimated_cost_per_person", "crowd_level", "best_time", "duration", "average_visit_minutes", "opens", "closes", "tip", "local_tip", "area", "area_name", "recommended_for", "slh")
+    keys = (
+        "id",
+        "name",
+        "category",
+        "tags",
+        "local_rating",
+        "tourist_rating",
+        "worth_it_score",
+        "price_level",
+        "cost",
+        "estimated_cost_per_person",
+        "crowd_level",
+        "best_time",
+        "duration",
+        "average_visit_minutes",
+        "opens",
+        "closes",
+        "tip",
+        "local_tip",
+        "area",
+        "area_name",
+        "recommended_for",
+        "slh",
+    )
     return {key: place[key] for key in keys if key in place}
 
 

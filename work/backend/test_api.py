@@ -99,8 +99,14 @@ def test_explicit_count_reserves_time_for_short_visits(monkeypatch):
     from . import planner
 
     places = [
-        {**BY_ID["nets"], "id": f"short-{i}", "name": f"Short visit {i}",
-         "duration": 15, "opens": 9, "closes": 22}
+        {
+            **BY_ID["nets"],
+            "id": f"short-{i}",
+            "name": f"Short visit {i}",
+            "duration": 15,
+            "opens": 9,
+            "closes": 22,
+        }
         for i in range(16)
     ]
     places.insert(0, {**places[0], "id": "long", "name": "Long visit", "duration": 180})
@@ -117,7 +123,9 @@ def test_shortfall_reports_requested_count_even_when_catalog_is_small():
         allow_ai=False,
     )
     count = len(plan["days"][0]["stops"])
-    assert any(f"scheduled {count} of 16 requested stops" in warning for warning in plan["warnings"])
+    assert any(
+        f"scheduled {count} of 16 requested stops" in warning for warning in plan["warnings"]
+    )
 
 
 def test_planner_schedules_lulu_only_once_across_catalog_aliases():
@@ -186,8 +194,16 @@ def test_large_budget_selects_premium_options_without_exceeding_cap(monkeypatch)
 
     # Keep the budget policy test independent of changes to the live place catalog.
     places = [
-        {**BY_ID["nets"], "id": f"premium-{i}", "name": f"Premium visit {i}",
-         "cost": 3000, "price_tier": "premium", "duration": 60, "opens": 9, "closes": 22}
+        {
+            **BY_ID["nets"],
+            "id": f"premium-{i}",
+            "name": f"Premium visit {i}",
+            "cost": 3000,
+            "price_tier": "premium",
+            "duration": 60,
+            "opens": 9,
+            "closes": 22,
+        }
         for i in range(5)
     ]
     places.append({**BY_ID["nets"], "cost": 0})
@@ -229,9 +245,7 @@ def test_completed_places_are_stored_in_visited_history(client):
     trip = create_trip(client, days=1, stops_per_day=1)
     stop = trip["days"][0]["stops"][0]
 
-    client.put(
-        f"/api/trips/{trip['id']}/stops/{stop['id']}", json={"completed": True}
-    )
+    client.put(f"/api/trips/{trip['id']}/stops/{stop['id']}", json={"completed": True})
 
     assert client.get("/api/me").json()["visited_places"] == [stop["place"]["id"]]
 
@@ -239,9 +253,7 @@ def test_completed_places_are_stored_in_visited_history(client):
 def test_new_places_only_excludes_visited_places(client):
     first = create_trip(client, days=1, stops_per_day=1)
     first_stop = first["days"][0]["stops"][0]
-    client.put(
-        f"/api/trips/{first['id']}/stops/{first_stop['id']}", json={"completed": True}
-    )
+    client.put(f"/api/trips/{first['id']}/stops/{first_stop['id']}", json={"completed": True})
 
     fresh = create_trip(client, days=1, stops_per_day=1, include_visited=False)
 
@@ -273,9 +285,7 @@ def test_saved_pre_area_trip_data_is_enriched_on_read(client):
 def test_unstarted_saved_trip_with_duplicate_venue_aliases_is_repaired(client):
     trip = create_trip(client, days=1, budget=2000, stops_per_day=5)
     with db.connect() as connection:
-        row = connection.execute(
-            "SELECT plan FROM trips WHERE id=?", (trip["id"],)
-        ).fetchone()
+        row = connection.execute("SELECT plan FROM trips WHERE id=?", (trip["id"],)).fetchone()
         plan = json.loads(row["plan"])
         duplicate_ids = ["kashi", "kashi_art_cafe"]
         for stop, place_id in zip(plan["days"][0]["stops"][:2], duplicate_ids):
@@ -293,9 +303,9 @@ def test_unstarted_saved_trip_with_duplicate_venue_aliases_is_repaired(client):
     assert sum(place_id in {"kashi", "kashi_art_cafe"} for place_id in restored_ids) == 1
     with db.connect() as connection:
         stored = json.loads(
-            connection.execute(
-                "SELECT plan FROM trips WHERE id=?", (trip["id"],)
-            ).fetchone()["plan"]
+            connection.execute("SELECT plan FROM trips WHERE id=?", (trip["id"],)).fetchone()[
+                "plan"
+            ]
         )
     assert [stop["place"]["id"] for stop in stored["days"][0]["stops"]] == restored_ids
 
@@ -505,7 +515,9 @@ def test_trip_uses_ai_candidate_and_ranking_pipeline_when_available(monkeypatch)
     monkeypatch.setattr(
         ai,
         "generate_candidates",
-        lambda _: [ai.Candidate(name="Chinese Fishing Nets", category="Nature", reason="Waterfront")],
+        lambda _: [
+            ai.Candidate(name="Chinese Fishing Nets", category="Nature", reason="Waterfront")
+        ],
     )
     monkeypatch.setattr(ai, "rerank_places", lambda _, places: [places[0]["id"]])
 
@@ -521,10 +533,20 @@ def test_trip_falls_back_for_all_gemini_failures(monkeypatch, failure):
     if failure == "missing":
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     elif failure == "malformed":
-        monkeypatch.setattr(ai, "generate_candidates", lambda _: (_ for _ in ()).throw(ai.GeminiUnavailableError("bad JSON")))
+        monkeypatch.setattr(
+            ai,
+            "generate_candidates",
+            lambda _: (_ for _ in ()).throw(ai.GeminiUnavailableError("bad JSON")),
+        )
     else:
-        error = httpx.TimeoutException("timeout") if failure == "timeout" else httpx.HTTPStatusError(
-            failure, request=httpx.Request("POST", "https://example.test"), response=httpx.Response(429 if failure == "quota" else 401)
+        error = (
+            httpx.TimeoutException("timeout")
+            if failure == "timeout"
+            else httpx.HTTPStatusError(
+                failure,
+                request=httpx.Request("POST", "https://example.test"),
+                response=httpx.Response(429 if failure == "quota" else 401),
+            )
         )
         monkeypatch.setattr(ai, "generate_candidates", lambda _: (_ for _ in ()).throw(error))
 

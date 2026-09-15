@@ -65,7 +65,9 @@ def _match_candidate_names(candidates, available):
         exact = [place for place in available if _normalise_name(place["name"]) == target]
         if exact:
             # Prefer the record carrying richer local metadata when names are duplicated.
-            matches.append(max(exact, key=lambda place: ("local_rating" in place, "worth_it_score" in place)))
+            matches.append(
+                max(exact, key=lambda place: ("local_rating" in place, "worth_it_score" in place))
+            )
             continue
         best = max(
             available,
@@ -88,9 +90,21 @@ def fallback_score(place, preferences, *, requested=False):
     daily_budget = preferences.budget - 400
     budget_match = 15 if place["cost"] <= daily_budget else -30
     slh = (slh_score(place["slh"]) or 0) / 10
-    travel_type_match = 8 if preferences.travel_type and preferences.travel_type in place.get("recommended_for", []) else 0
+    travel_type_match = (
+        8
+        if preferences.travel_type and preferences.travel_type in place.get("recommended_for", [])
+        else 0
+    )
     requested_bonus = 40 if requested else 0
-    return interest_match + local_rating + worth_it + budget_match + slh + travel_type_match + requested_bonus
+    return (
+        interest_match
+        + local_rating
+        + worth_it
+        + budget_match
+        + slh
+        + travel_type_match
+        + requested_bonus
+    )
 
 
 def _eligible_places(preferences, excluded):
@@ -108,7 +122,10 @@ def _rank_places(preferences, available, chosen_ids, *, allow_ai=True):
     """Use Gemini only as a ranking signal; local score remains the safe baseline."""
     local_ranked = sorted(
         available,
-        key=lambda place: (fallback_score(place, preferences, requested=place["id"] in chosen_ids), place["id"]),
+        key=lambda place: (
+            fallback_score(place, preferences, requested=place["id"] in chosen_ids),
+            place["id"],
+        ),
         reverse=True,
     )
     if not allow_ai:
@@ -133,7 +150,9 @@ def _rank_places(preferences, available, chosen_ids, *, allow_ai=True):
     except ai.GeminiUnavailableError:
         return local_ranked, "fallback"
     except Exception:
-        logger.exception("Gemini recommendation failed unexpectedly. Falling back to local recommendation engine.")
+        logger.exception(
+            "Gemini recommendation failed unexpectedly. Falling back to local recommendation engine."
+        )
         return local_ranked, "fallback"
 
 
@@ -148,9 +167,7 @@ def generate_plan(preferences, *, excluded=None, requested=None, allow_ai=True):
     venues = {}
     for place in available:
         key = venue_key(place)
-        if key not in venues or (
-            place["id"] in chosen_ids and venues[key]["id"] not in chosen_ids
-        ):
+        if key not in venues or (place["id"] in chosen_ids and venues[key]["id"] not in chosen_ids):
             venues[key] = place
     available = list(venues.values())
     candidates, recommendation_mode = _rank_places(
@@ -248,9 +265,7 @@ def generate_plan(preferences, *, excluded=None, requested=None, allow_ai=True):
             )
         )
     used_venues = {venue_key(BY_ID[id]) for id in used}
-    missed = [
-        BY_ID[id]["name"] for id in chosen_ids if venue_key(BY_ID[id]) not in used_venues
-    ]
+    missed = [BY_ID[id]["name"] for id in chosen_ids if venue_key(BY_ID[id]) not in used_venues]
     if missed:
         warnings.append(
             "Some requested stops did not fit the constraints: " + ", ".join(missed) + "."
@@ -263,7 +278,11 @@ def generate_plan(preferences, *, excluded=None, requested=None, allow_ai=True):
         total_cost=sum(d["cost"] for d in days),
         budget_utilization=round(sum(d["cost"] for d in days) / (budget * preferences.days) * 100),
         warnings=warnings,
-        method=("Gemini-assisted local planner" if recommendation_mode == "ai" else "Rule-based local planner"),
+        method=(
+            "Gemini-assisted local planner"
+            if recommendation_mode == "ai"
+            else "Rule-based local planner"
+        ),
         recommendation_mode=recommendation_mode,
         routing="Estimated walking or local-transit time; map lines are not road directions",
         cost_note="Per person. The planner aims to use the available daily budget without exceeding it and includes ₹400/day for food and local transport. Stay and travel to Kochi are excluded. Venue prices and hours are sample estimates.",
