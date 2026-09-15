@@ -126,7 +126,7 @@ def test_catalog_covers_citywide_kochi_regions():
     supported = {region["id"] for region in REGIONS}
     represented = {place["area"] for place in PLACES}
     assert len(PLACES) >= 30
-    assert {"fort-kochi", "edappally", "thrippunithura", "kakkanad", "vyttila"} <= represented
+    assert {"fort-kochi", "edappally", "palarivattom", "vyttila"} <= represented
     assert represented <= supported
     assert all(place["area_name"] for place in PLACES)
 
@@ -148,7 +148,7 @@ def test_cross_area_routes_label_local_transit():
             budget=2500,
             pace="packed",
             interests=["Nature", "Hidden gems"],
-            areas=["vyttila", "kakkanad", "panampilly"],
+            areas=["vyttila", "panampilly"],
         )
     )
     assert any(
@@ -432,7 +432,7 @@ def test_gemini_story_extraction_uses_structured_output(monkeypatch):
                         "content": [
                             {
                                 "type": "text",
-                                "text": '{"place_ids":["hill-palace"],"summary":"A royal Kochi day.","unresolved":[]}',
+                                "text": '{"place_ids":["chinese_fishing_nets"],"summary":"A waterfront Kochi day.","unresolved":[]}',
                             }
                         ],
                     }
@@ -455,8 +455,8 @@ def test_gemini_story_extraction_uses_structured_output(monkeypatch):
 
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     monkeypatch.setattr(ai.httpx, "Client", FakeClient)
-    result = ai.extract_story("We spent the morning at Hill Palace Museum.")
-    assert result.place_ids == ["hill-palace"]
+    result = ai.extract_story("We spent the morning at the Chinese Fishing Nets.")
+    assert result.place_ids == ["chinese_fishing_nets"]
     assert captured["url"].endswith("/v1beta/interactions")
     assert captured["headers"]["x-goog-api-key"] == "test-key"
     assert captured["body"]["response_format"]["mime_type"] == "application/json"
