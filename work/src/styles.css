@@ -164,6 +164,7 @@ p {
   align-items: center;
 }
 .site-header nav a {
+  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -815,6 +816,12 @@ footer a:not(.brand):hover {
   }
 }
 @media (max-width: 1150px) {
+  .site-header nav {
+    gap: 20px;
+  }
+  .share-link {
+    display: none;
+  }
   .nav-shell,
   .main-shell {
     padding-left: 30px;
@@ -897,13 +904,14 @@ footer a:not(.brand):hover {
     height: 340px;
   }
 }
-@media (max-width: 650px) {
+@media (max-width: 760px) {
   .nav-shell {
     padding: 0 20px;
     gap: 15px;
   }
   .site-header {
     height: 70px;
+    backdrop-filter: none;
   }
   .brand {
     font-size: 1.8rem;
@@ -924,6 +932,7 @@ footer a:not(.brand):hover {
     backdrop-filter: blur(20px);
     border-top: 1px solid var(--border);
     justify-content: space-around;
+    gap: 0;
     z-index: 100;
   }
   .site-header nav a {
@@ -931,10 +940,15 @@ footer a:not(.brand):hover {
     flex-direction: column;
     gap: 4px;
     font-size: 0.7rem;
-    padding: 3px 20px;
+    padding: 3px 4px;
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
   }
   .site-header nav a.active:after {
-    display: none;
+    bottom: -4px;
+    left: 25%;
+    right: 25%;
   }
   .main-shell {
     padding: 26px 20px 80px;

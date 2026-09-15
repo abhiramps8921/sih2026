@@ -26,7 +26,7 @@ export default function Explore() {
   const active = params.get('interest') || 'All experiences';
   const activeArea = params.get('area') || '';
   const query = params.get('q') || '';
-  const { me, places, regions, showSLH, toggleSave, bookmarkBusy } = useApp();
+  const { me, places, regions, showSLH, toggleSave, bookmarkBusy, plannerHref } = useApp();
   const saved = me.saved;
   const collection = templates.map((t) => ({
     ...t,
@@ -59,9 +59,9 @@ export default function Explore() {
           </h1>
           <p>Good places. Real people. A little more local.</p>
         </div>
-        <Link to="/plan" className="button dark">
+        <Link to={plannerHref} className="button dark">
           <Sparkles size={18} />
-          Build my trip
+          Plan a trip
           <ArrowUpRight size={17} />
         </Link>
       </div>
@@ -268,8 +268,8 @@ export default function Explore() {
               <em>Your kind of trip.</em>
             </h2>
             <p>A day-by-day plan with local finds, good food, and room to wander.</p>
-            <Link to="/plan" className="button dark">
-              Let’s plan something
+            <Link to={plannerHref} className="button dark">
+              Plan a trip
               <ArrowRight size={17} />
             </Link>
             <span className="fine-print">1–3 days · Made for your budget</span>

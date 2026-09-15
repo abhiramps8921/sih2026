@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, NavLink, Routes, Route, useLocation } from 'react-router-dom';
-import { Compass, Map, Users, Plus, Footprints, LoaderCircle } from 'lucide-react';
+import { Compass, Map, Users, Plus, Footprints, LoaderCircle, Sparkles } from 'lucide-react';
 import Explore from './Explore';
 import Auth from './Auth';
 import { api, send } from './api';
@@ -21,6 +21,14 @@ export default function App() {
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const location = useLocation();
+  const plannerParams = new URLSearchParams();
+  if (location.pathname === '/') {
+    const exploreParams = new URLSearchParams(location.search);
+    for (const key of ['area', 'interest', 'pace']) {
+      if (exploreParams.get(key)) plannerParams.set(key, exploreParams.get(key));
+    }
+  }
+  const plannerHref = plannerParams.size ? `/plan?${plannerParams}` : '/plan';
   async function refresh() {
     const profile = await api('/me');
     setMe(profile);
@@ -91,6 +99,7 @@ export default function App() {
         bookmarkBusy,
         notify: setToast,
         showSLH: setSlhPlace,
+        plannerHref,
       }}
     >
       <a className="skip-link" href="#main">
@@ -109,6 +118,10 @@ export default function App() {
               <NavLink to="/" end>
                 <Compass size={18} />
                 Explore
+              </NavLink>
+              <NavLink to={plannerHref}>
+                <Sparkles size={18} />
+                Plan a trip
               </NavLink>
               <NavLink to="/trips">
                 <Map size={18} />

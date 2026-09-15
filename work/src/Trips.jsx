@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { useApp } from './context';
 import { api, send } from './api';
-import { templates, money } from './data';
+import { templates, money, interests } from './data';
 import { PageHeading, ErrorNotice, SLHPill } from './components';
 import TripMap from './TripMap';
 
@@ -41,10 +41,18 @@ export function Planner() {
   const { refresh, regions } = useApp();
   const navigate = useNavigate();
   const [tags, setTags] = useState(
-    template?.tags.filter((t) => t !== 'Hidden gems') || ['Culture', 'Food'],
+    interests.includes(params.get('interest')) && params.get('interest') !== 'All experiences'
+      ? [params.get('interest')]
+      : template?.tags.filter((t) => t !== 'Hidden gems') || ['Culture', 'Food'],
   );
-  const [pace, setPace] = useState('balanced');
-  const [areas, setAreas] = useState([]);
+  const [pace, setPace] = useState(
+    ['relaxed', 'balanced', 'packed'].includes(params.get('pace'))
+      ? params.get('pace')
+      : 'balanced',
+  );
+  const [areas, setAreas] = useState(() =>
+    regions.filter((region) => region.name === params.get('area')).map((region) => region.id),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function generate(e) {
@@ -349,7 +357,7 @@ export function Itinerary() {
           From {money(template.cost)} / person
         </span>
         <Link className="button dark" to={`/plan?template=${id}`}>
-          Make this trip mine
+          Plan a trip
           <ArrowRight size={17} />
         </Link>
       </div>
@@ -499,7 +507,7 @@ export function MyTrips() {
               : 'Build your first itinerary and make it a trip to remember.'}
           </p>
           <Link className="button dark" to={saved ? '/' : '/plan'}>
-            {saved ? 'Explore trips' : 'Plan my first trip'}
+            {saved ? 'Explore trips' : 'Plan a trip'}
             <ArrowRight size={17} />
           </Link>
         </div>
