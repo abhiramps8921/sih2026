@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { templates, interests, money, slhScore, templateSLH } from './data';
 import { useApp } from './context';
+import TravelType, { selectedTravelType } from './TravelType';
 import { SLHPill } from './components';
 
 const categoryIcons = [Compass, Utensils, Landmark, Leaf, Palette, Sparkles, ShoppingBag];
@@ -26,6 +27,12 @@ export default function Explore() {
   const active = params.get('interest') || 'All experiences';
   const activeArea = params.get('area') || '';
   const query = params.get('q') || '';
+  const search = query.trim().toLowerCase();
+  const travelType = selectedTravelType(params);
+  const hasCollectionSelection = Boolean(
+    activeArea || active !== 'All experiences' || search || travelType,
+  );
+  const itineraryHref = (id) => `/itinerary/${id}${params.size ? `?${params}` : ''}`;
   const { me, places, regions, showSLH, toggleSave, bookmarkBusy, plannerHref } = useApp();
   const saved = me.saved;
   const collection = templates.map((t) => ({
@@ -38,14 +45,20 @@ export default function Explore() {
       (!params.has('slh') || t.slh >= 90) &&
       (active === 'All experiences' || t.tags.includes(active) || t.category === active) &&
       (!activeArea || t.areas.includes(activeArea)) &&
-      `${t.title} ${t.tags.join(' ')} ${t.areas.join(' ')}`
+      (!travelType || t.travelTypes?.includes(travelType)) &&
+      `${t.title} ${t.subtitle} ${t.tags.join(' ')} ${t.areas.join(' ')} ${t.category}`
         .toLowerCase()
-        .includes(query.toLowerCase()),
+        .includes(search),
   );
   const update = (key, value) => {
     const next = new URLSearchParams(params);
     value ? next.set(key, value) : next.delete(key);
     setParams(next, { replace: true });
+  };
+  const clearCollectionFilters = () => {
+    const next = new URLSearchParams(params);
+    for (const key of ['area', 'interest', 'q', 'slh']) next.delete(key);
+    setParams(next);
   };
   return (
     <main id="main" className="main-shell">
@@ -130,6 +143,7 @@ export default function Explore() {
           </button>
         ))}
       </div>
+      <TravelType />
       <div className="explore-grid">
         <div className="explore-content">
           <section className="feature-banner">
@@ -151,7 +165,7 @@ export default function Explore() {
                 <br />a local’s eyes.
               </h2>
               <p>Take the streets less scrolled.</p>
-              <Link className="button white" to="/itinerary/slow-kochi">
+              <Link className="button white" to={itineraryHref('slow-kochi')}>
                 Explore the local favourite
                 <ArrowUpRight size={17} />
               </Link>
@@ -174,17 +188,26 @@ export default function Explore() {
             <div className="section-heading">
               <div>
                 <h2>Worth taking the long way.</h2>
-                <p>Thoughtful itineraries, inspired by people who know the place.</p>
+                <p>
+                  {hasCollectionSelection
+                    ? 'Thoughtful itineraries, inspired by people who know the place.'
+                    : 'A few local-favourite itineraries to get you started.'}
+                </p>
               </div>
               <span className="collection-label">
                 THE LOCAL EDIT <ArrowUpRight size={16} />
               </span>
+              {hasCollectionSelection && (
+                <button className="text-button" onClick={clearCollectionFilters}>
+                  Clear filters
+                </button>
+              )}
             </div>
             <div className="trip-grid">
               {visible.map((t) => (
                 <article className="trip-card" key={t.id}>
                   <div className="card-photo">
-                    <Link to={`/itinerary/${t.id}`} tabIndex={-1} aria-hidden="true">
+                    <Link to={itineraryHref(t.id)} tabIndex={-1} aria-hidden="true">
                       <img
                         src={t.image}
                         alt=""
@@ -218,7 +241,7 @@ export default function Explore() {
                       />
                     </div>
                     <h3>
-                      <Link to={`/itinerary/${t.id}`}>{t.title}</Link>
+                      <Link to={itineraryHref(t.id)}>{t.title}</Link>
                     </h3>
                     <p>{t.subtitle}</p>
                     <div className="trip-facts">
@@ -242,14 +265,11 @@ export default function Explore() {
                 </article>
               ))}
             </div>
-            {visible.length === 0 && (
+            {hasCollectionSelection && visible.length === 0 && (
               <div className="empty-state">
                 <Search />
                 <h3>No trips found</h3>
-                <p>Try a different interest or search term.</p>
-                <button className="button" onClick={() => setParams({})}>
-                  Clear filters
-                </button>
+                <p>Try a different area, interest, or search term, or clear your filters.</p>
               </div>
             )}
           </section>

@@ -25,6 +25,7 @@ import { api, send } from './api';
 import { templates, money, interests } from './data';
 import { PageHeading, ErrorNotice, SLHPill } from './components';
 import TripMap from './TripMap';
+import TravelType, { selectedTravelType } from './TravelType';
 
 function localDate() {
   const d = new Date();
@@ -34,10 +35,12 @@ const dateLabel = (value) =>
   new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(
     new Date(`${value}T12:00:00`),
   );
+const stopChoiceByPace = { relaxed: '3', balanced: 'custom', packed: '5' };
 
 export function Planner() {
   const [params] = useSearchParams();
   const template = templates.find((t) => t.id === params.get('template'));
+  const requestedPace = params.get('pace');
   const { refresh, regions } = useApp();
   const navigate = useNavigate();
   const [tags, setTags] = useState(
@@ -45,11 +48,9 @@ export function Planner() {
       ? [params.get('interest')]
       : template?.tags.filter((t) => t !== 'Hidden gems') || ['Culture', 'Food'],
   );
-  const [pace, setPace] = useState(
-    ['relaxed', 'balanced', 'packed'].includes(params.get('pace'))
-      ? params.get('pace')
-      : 'balanced',
-  );
+  const [stopChoice, setStopChoice] = useState(stopChoiceByPace[requestedPace] || '5');
+  const [customStops, setCustomStops] = useState('4');
+  const [includeVisited, setIncludeVisited] = useState(true);
   const [areas, setAreas] = useState(() =>
     regions.filter((region) => region.name === params.get('area')).map((region) => region.id),
   );
@@ -65,12 +66,14 @@ export function Planner() {
         days: Number(form.get('days')),
         budget: Number(form.get('budget')),
         start_date: form.get('date'),
+        travel_type: selectedTravelType(params),
         interests: tags,
         areas,
-        pace,
+        stops_per_day: Number(stopChoice === 'custom' ? customStops : stopChoice),
         min_slh: Number(form.get('slh')),
         template_id: template?.id || null,
         title: form.get('title'),
+        include_visited: includeVisited,
       });
       await refresh();
       navigate(`/trips/${trip.id}`);
@@ -129,6 +132,7 @@ export function Planner() {
               ))}
             </div>
           </fieldset>
+          <TravelType />
           <label className="field">
             Give your trip a name
             <input
@@ -204,27 +208,74 @@ export function Planner() {
             </div>
           </fieldset>
           <fieldset className="tag-fieldset">
-            <legend>Choose your pace</legend>
+            <legend>How many stops in a day?</legend>
             <div className="pace-grid">
               {[
-                ['relaxed', 'Slow & easy', '3 stops a day', Leaf],
-                ['balanced', 'A happy balance', '4 stops a day', Footprints],
-                ['packed', 'See a little more', '5 stops a day', Sparkles],
+                ['3', '3 stops', 'A slower day', Leaf],
+                ['5', '5 stops', 'See a little more', Sparkles],
+                ['custom', 'Custom', 'Up to 20 stops', Plus],
               ].map(([value, title, sub, Icon]) => (
-                <label key={value} className={`pace-choice ${pace === value ? 'selected' : ''}`}>
+                <label
+                  key={value}
+                  className={`pace-choice ${stopChoice === value ? 'selected' : ''}`}
+                >
                   <input
                     type="radio"
-                    name="pace"
+                    name="stop-choice"
                     value={value}
-                    checked={pace === value}
-                    onChange={() => setPace(value)}
+                    checked={stopChoice === value}
+                    onChange={() => setStopChoice(value)}
                   />
                   <Icon size={20} />
+                  <strong>{title}</strong>
+                  <small>{sub}</small>
+                  {value === 'custom' && stopChoice === 'custom' && (
+                    <input
+                      className="custom-stop-input"
+                      type="number"
+                      inputMode="numeric"
+                      min="1"
+                      max="20"
+                      step="1"
+                      value={customStops}
+                      onChange={(event) => setCustomStops(event.target.value)}
+                      aria-label="Custom stops per day"
+                      required
+                    />
+                  )}
+                </label>
+              ))}
+            </div>
+            <p className="field-hint stop-count-hint">
+              Opening hours, travel time, and budget may reduce the final number of stops.
+            </p>
+          </fieldset>
+          <fieldset className="tag-fieldset">
+            <legend>Places you’ve already visited</legend>
+            <div className="pace-grid visited-choice-grid">
+              {[
+                [true, 'Include them', 'Mix favourites with new discoveries'],
+                [false, 'New places only', 'Leave previously completed places out'],
+              ].map(([value, title, sub]) => (
+                <label
+                  key={String(value)}
+                  className={`pace-choice ${includeVisited === value ? 'selected' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="include-visited"
+                    checked={includeVisited === value}
+                    onChange={() => setIncludeVisited(value)}
+                  />
+                  <MapPin size={20} />
                   <strong>{title}</strong>
                   <small>{sub}</small>
                 </label>
               ))}
             </div>
+            <p className="field-hint stop-count-hint">
+              A place joins your visited history when you mark that stop complete.
+            </p>
           </fieldset>
           <label className="field">
             Minimum SLH score
@@ -314,18 +365,7 @@ export function Itinerary() {
         The local edit
       </Link>
       <div className="detail-hero">
-        <img
-          src={template.image}
-          alt={
-            template.category === 'Food trail'
-              ? 'Kerala banana-leaf meal'
-              : template.category === 'Culture & heritage'
-                ? 'Interior of Mattancherry Palace'
-                : 'Kochi fishing nets at sunset'
-          }
-          width="1200"
-          height="650"
-        />
+        <img src={template.image} alt={template.imageAlt} width="1200" height="650" />
         <div className="detail-shade" />
         <div className="detail-title">
           <span className="glass-label">{template.category.toUpperCase()} · KOCHI</span>
@@ -356,7 +396,10 @@ export function Itinerary() {
           <Wallet size={18} />
           From {money(template.cost)} / person
         </span>
-        <Link className="button dark" to={`/plan?template=${id}`}>
+        <Link
+          className="button dark"
+          to={`/plan?${new URLSearchParams({ ...Object.fromEntries(params), template: id })}`}
+        >
           Plan a trip
           <ArrowRight size={17} />
         </Link>
@@ -372,7 +415,11 @@ export function Itinerary() {
                 key={i}
                 aria-pressed={day === i + 1}
                 className={day === i + 1 ? 'active' : ''}
-                onClick={() => setParams({ day: i + 1 })}
+                onClick={() => {
+                  const next = new URLSearchParams(params);
+                  next.set('day', i + 1);
+                  setParams(next);
+                }}
               >
                 Day {i + 1}
               </button>

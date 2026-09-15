@@ -195,6 +195,9 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
+.visited-choice-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 .pace-choice {
   display: flex;
   flex-direction: column;
@@ -208,7 +211,7 @@
   color: #728068;
   font-size: 0.77rem;
 }
-.pace-choice input {
+.pace-choice > input[type='radio'] {
   position: absolute;
   right: 10px;
   top: 10px;
@@ -224,6 +227,19 @@
 .pace-choice.selected {
   border-color: #71965c;
   background: #f2f7e9;
+}
+.custom-stop-input {
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 1px solid #bdc9b5;
+  border-radius: 8px;
+  background: white;
+  color: #3d5136;
+  font: inherit;
+}
+.stop-count-hint {
+  margin-top: 10px;
 }
 .spaced {
   margin-top: 30px;
@@ -1435,7 +1451,7 @@ progress::-moz-progress-bar {
   .pace-choice small {
     font-size: 0.65rem;
   }
-  .pace-choice input {
+  .pace-choice > input[type='radio'] {
     right: 5px;
     top: 6px;
   }
@@ -1791,4 +1807,20 @@ progress::-moz-progress-bar {
   .feature-banner {
     height: 380px;
   }
+}
+
+.travel-type {
+  margin-bottom: 24px;
+}
+.travel-type .interest-row {
+  margin-bottom: 12px;
+}
+.group-form {
+  max-width: 760px;
+}
+.group-actions {
+  margin-top: 20px;
+}
+.group-body {
+  overflow-wrap: anywhere;
 }

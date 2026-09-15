@@ -4,19 +4,15 @@ import {
   ArrowRight,
   ArrowUpRight,
   Award,
-  Check,
   CheckCircle2,
-  Clock,
   FileText,
   Footprints,
   Leaf,
   LoaderCircle,
   MapPin,
-  MessageCircle,
   Plus,
   ShieldCheck,
   Sparkles,
-  Users,
   Wallet,
   BadgeCheck,
   Droplets,
@@ -24,161 +20,6 @@ import {
 import { useApp } from './context';
 import { api, send } from './api';
 import { PageHeading, ErrorNotice, SLHPill } from './components';
-
-export function Community() {
-  const [groups, setGroups] = useState([]);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState('');
-  const { notify } = useApp();
-  useEffect(() => {
-    api('/groups')
-      .then(setGroups)
-      .catch((e) => setError(e.message));
-  }, []);
-  async function request(group) {
-    setBusy(group.id);
-    setError('');
-    try {
-      await send(`/groups/${group.id}`, 'PUT', { saved: !group.status });
-      setGroups(await api('/groups'));
-      notify(
-        group.status
-          ? 'Demo request withdrawn.'
-          : 'Demo request saved. No real person was contacted.',
-      );
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusy('');
-    }
-  }
-  return (
-    <main id="main" className="main-shell">
-      <PageHeading
-        eyebrow="SOME STORIES ARE BETTER SHARED"
-        title="Find your kind of people"
-        subtitle="Shared interests. A common route. A new conversation."
-        action={
-          <Link className="button dark" to="/create">
-            <Plus size={17} />
-            Share your experience
-          </Link>
-        }
-      />
-      <div className="community-banner">
-        <span className="community-symbol">
-          <Users size={35} />
-        </span>
-        <div>
-          <span className="eyebrow">THE COMPANY MAKES THE JOURNEY</span>
-          <h2>Solo doesn’t have to mean alone.</h2>
-          <p>Explore sample departures and try the request-to-join flow.</p>
-        </div>
-        <span className="tag">Demo community</span>
-      </div>
-      <div className="section-heading">
-        <div>
-          <h2>A few good people, a little adventure.</h2>
-          <p>Sample group trips in Kochi · No live matching</p>
-        </div>
-      </div>
-      <ErrorNotice error={error} />
-      <div className="community-grid">
-        {groups.map((g, i) => (
-          <article className="group-card" key={g.id}>
-            <img
-              src={i ? '/images/heritage.jpg' : '/images/kochi.jpg'}
-              alt={i ? 'Mattancherry Palace interior' : 'Kochi waterfront'}
-              width="750"
-              height="400"
-              loading="lazy"
-            />
-            <div className="group-body">
-              <div className="card-meta">
-                <span className="tag">Sample departure</span>
-                <span>
-                  <Users size={14} />
-                  {g.members} / {g.capacity} sample spots
-                </span>
-              </div>
-              <h2>{g.title}</h2>
-              <div className="group-facts">
-                <span>
-                  <Clock size={16} />
-                  {new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'long' }).format(
-                    new Date(g.date + 'T12:00:00'),
-                  )}{' '}
-                  · {g.time}
-                </span>
-                <span>
-                  <MapPin size={16} />
-                  {g.place}
-                </span>
-              </div>
-              <div className="tag-options">
-                {g.tags.map((t) => (
-                  <span key={t} className="tag">
-                    {t}
-                  </span>
-                ))}
-              </div>
-              <div className="group-host">
-                <span className="avatar">{g.initials}</span>
-                <span>
-                  Hosted by {g.host}
-                  <small>Sample profile</small>
-                </span>
-                <button
-                  className={`button ${g.status ? '' : 'dark'}`}
-                  onClick={() => request(g)}
-                  disabled={!!busy}
-                >
-                  {busy === g.id ? (
-                    <LoaderCircle className="spin" size={16} />
-                  ) : g.status ? (
-                    <Check size={16} />
-                  ) : (
-                    <Plus size={16} />
-                  )}{' '}
-                  {g.status ? 'Withdraw request' : 'Try join request'}
-                </button>
-              </div>
-              {g.status && (
-                <p className="small-copy">
-                  Demo request pending. There is no live host approval or chat.
-                </p>
-              )}
-            </div>
-          </article>
-        ))}
-      </div>
-      <section className="community-principles">
-        <div>
-          <ShieldCheck />
-          <h3>Your choice, always</h3>
-          <p>No public discovery without opting in. Your private itinerary stays yours.</p>
-        </div>
-        <div>
-          <MapPin />
-          <h3>Meet in public</h3>
-          <p>Public, popular places make better meeting points. Never share your stay address.</p>
-        </div>
-        <div>
-          <MessageCircle />
-          <h3>Real connection, thoughtfully</h3>
-          <p>
-            Verified accounts, reporting, blocking and group chat are planned before public
-            matching.
-          </p>
-        </div>
-      </section>
-      <p className="notice">
-        This is a social feature demonstration. Requests are saved only for your guest session; no
-        real travelers are contacted and no meetup is arranged.
-      </p>
-    </main>
-  );
-}
 
 export function CreateTrip() {
   const { places, notify, refresh } = useApp();
@@ -620,6 +461,39 @@ export function Credits() {
             'Reshmi.vm',
             '6/69/Kerala_Feast_or_Kerala_Sadya.jpg',
             'Kerala_Feast_or_Kerala_Sadya.jpg',
+            '4.0',
+            'by-sa',
+          ],
+          [
+            'Sunset with Chinese Fishing Nets, Fort Kochi',
+            'Rangan Datta Wiki',
+            '',
+            'Sunset_with_Chinese_Fishing_Nets,_Fort_Kochi_1.jpg',
+            '4.0',
+            'by-sa',
+          ],
+          ['Hill Palace by GV-1', 'Gokulvarmank', '', 'Hill_Palace_by_GV-1.JPG', '3.0', 'by'],
+          [
+            'Marine Drive Cochin by KS',
+            'Krissubh',
+            '',
+            'Marine_Drive_Cochin_by_KS.jpg',
+            '4.0',
+            'by-sa',
+          ],
+          [
+            'Kochi metro Edappally station platform',
+            'Ranjithsiji',
+            '',
+            'Kochi_metro_edappilly_station_platform.jpg',
+            '4.0',
+            'by-sa',
+          ],
+          [
+            'Vyttila Water Metro station entry',
+            'Ravi Dwivedi',
+            '',
+            'Vyttila_water_metro_station_entry.jpg',
             '4.0',
             'by-sa',
           ],

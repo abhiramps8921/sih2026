@@ -50,7 +50,7 @@ The deterministic planner owns feasibility. It:
 2. Filters the place catalog.
 3. Ranks requested and relevant places, including cost fit against the remaining daily budget.
 4. Accounts for travel time and opening windows.
-5. Fits 3, 4 or 5 stops per day for relaxed, balanced or packed pacing.
+5. Fits 3 stops, 5 stops or a custom target of up to 20 stops per day.
 6. Adds a 20-minute buffer between visits.
 7. Reserves ₹400 per day for food and local transport outside listed stop costs.
 8. Favors premium dining and activities when a larger budget makes them appropriate.

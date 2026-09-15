@@ -14,7 +14,8 @@ A responsive Kochi travel app with a React/JavaScript interface, Python/FastAPI 
 - Inspect Safety, Legitimacy and Hygiene scores, dimensions, review count, date and methodology. Trip scores derive from their stops.
 - Save travel stories, review catalog-matched places, edit drafts and turn them into scheduled trips.
 - Opt into optional Gemini extraction when a backend Google AI key is configured; failures preserve the original story with an explicitly labeled fallback.
-- Try persistent, explicitly demo-only group join/withdraw requests.
+- Choose Family, Group, or Solo below the area filters. The URL preserves the preference through refresh, browser history, and planning.
+- Create and directly join account-owned Community groups, leave memberships, and close groups you own. SQLite transactions prevent overbooking and duplicate membership.
 - Keyboard-friendly controls, focus-managed SLH dialogs, responsive layouts and reduced-motion styles.
 
 ## Run locally (Windows PowerShell)
@@ -66,7 +67,9 @@ Premium dining examples are based on the official venue listings for [Kochi Kitc
 
 SLH = `(Safety + Legitimacy + Hygiene) / 15 × 100`, with each dimension rated 1–5. Legitimacy is scam resistance: a higher L score means a lower likelihood of misleading listings, hidden charges or untrustworthy operators. Missing or invalid dimensions result in no rating. An itinerary’s score averages its stop dimensions equally. No score certifies safety. No actual reviews are collected yet.
 
-Story publishing, live stranger matching/chat, verified accounts, moderation, multi-city scale and real routing-provider integration remain beyond this local MVP. Community requests contact nobody. Native Android/iOS packaging is not included; this deliverable is the responsive web application.
+Community groups collect a name, date, public meeting point, capacity (2–50 including the owner), and interests. Optional itinerary sharing requires explicit consent and publishes only a fixed snapshot of the title and stop names to signed-in travelers. Private trip details and member identities are not exposed. Owners close groups before leaving; closed and past groups cannot accept new members. Family is an explicit planner preference; this catalog has no verified child-suitability information, so it does not change ranking or imply child suitability.
+
+Story publishing, group chat, invitation links, host approval, verified accounts, moderation, multi-city scale and real routing-provider integration remain beyond this local MVP. Native Android/iOS packaging is not included; this deliverable is the responsive web application. Groups and memberships require the same persistent database storage as accounts and trips in deployment.
 
 ## Checks
 

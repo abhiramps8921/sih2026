@@ -7,7 +7,8 @@ import { api, send } from './api';
 import { AppContext } from './context';
 import { SLHDetails } from './components';
 import { Planner, Itinerary, MyTrips, ActiveTrip } from './Trips';
-import { Community, CreateTrip, Profile, SLHGuide, Credits } from './Pages';
+import Community from './Community';
+import { CreateTrip, Profile, SLHGuide, Credits } from './Pages';
 import { usePlannerTool } from './webmcp';
 export default function App() {
   usePlannerTool();
@@ -22,9 +23,13 @@ export default function App() {
   const [logoutBusy, setLogoutBusy] = useState(false);
   const location = useLocation();
   const plannerParams = new URLSearchParams();
-  if (location.pathname === '/') {
+  if (
+    location.pathname === '/' ||
+    location.pathname.startsWith('/itinerary/') ||
+    location.pathname === '/plan'
+  ) {
     const exploreParams = new URLSearchParams(location.search);
-    for (const key of ['area', 'interest', 'pace']) {
+    for (const key of ['area', 'interest', 'pace', 'travel_type']) {
       if (exploreParams.get(key)) plannerParams.set(key, exploreParams.get(key));
     }
   }
