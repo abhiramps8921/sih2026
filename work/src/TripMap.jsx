@@ -16,7 +16,7 @@ export default function TripMap({ stops }) {
     const points = stops.map((s) => [s.place.lat, s.place.lng]);
     stops.forEach((stop, index) => {
       const popup = document.createElement('span');
-      popup.textContent = stop.place.name;
+      popup.textContent = `${index + 1}. ${stop.place.name}`;
       L.marker(points[index], {
         icon: L.divIcon({
           className: 'number-pin',
@@ -24,7 +24,7 @@ export default function TripMap({ stops }) {
           iconSize: [30, 30],
           iconAnchor: [15, 15],
         }),
-        title: stop.place.name,
+        title: `${index + 1}. ${stop.place.name}`,
       })
         .bindPopup(popup)
         .addTo(map);
