@@ -181,14 +181,26 @@ def test_cross_area_routes_label_local_transit():
     )
 
 
-def test_large_budget_selects_premium_options_without_exceeding_cap():
+def test_large_budget_selects_premium_options_without_exceeding_cap(monkeypatch):
+    from . import planner
+
+    # Keep the budget policy test independent of changes to the live place catalog.
+    places = [
+        {**BY_ID["nets"], "id": f"premium-{i}", "name": f"Premium visit {i}",
+         "cost": 3000, "price_tier": "premium", "duration": 60, "opens": 9, "closes": 22}
+        for i in range(5)
+    ]
+    places.append({**BY_ID["nets"], "cost": 0})
+    monkeypatch.setattr(planner, "PLACES", places)
+    monkeypatch.setattr(planner, "BY_ID", {p["id"]: p for p in places})
     budget = 20000
     plan = generate_plan(
         Preferences(
             days=1,
             budget=budget,
             pace="packed",
-        )
+        ),
+        allow_ai=False,
     )
     assert plan["total_cost"] <= budget
     assert plan["budget_utilization"] >= 70
