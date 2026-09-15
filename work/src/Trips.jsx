@@ -571,6 +571,7 @@ export function ActiveTrip() {
   const { id } = useParams();
   const { refresh, showSLH, notify } = useApp();
   const [trip, setTrip] = useState(null);
+  const [focusRequest, setFocusRequest] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [params, setParams] = useSearchParams();
@@ -646,6 +647,17 @@ export function ActiveTrip() {
   const day = trip.days[dayIndex];
   const allStops = trip.days.flatMap((d) => d.stops);
   const done = allStops.filter((s) => s.completed).length;
+  function viewRoute(stop) {
+    setFocusRequest({ stopId: stop.id });
+    const map = document.getElementById('itinerary-map');
+    map?.focus({ preventScroll: true });
+    map?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'instant'
+        : 'smooth',
+      block: 'center',
+    });
+  }
   return (
     <main id="main" className="main-shell">
       <Link className="back-link" to="/trips">
@@ -779,15 +791,28 @@ export function ActiveTrip() {
                       <CheckCircle2 size={16} />
                       {stop.completed ? 'Completed · Undo' : 'Mark as complete'}
                     </button>
-                    <a
-                      className="navigation-link"
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${stop.place.lat},${stop.place.lng}&travelmode=${stop.travel_mode === 'local transit' ? 'transit' : 'walking'}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Directions
-                      <ArrowUpRight size={15} />
-                    </a>
+                    <div className="route-actions">
+                      <button
+                        type="button"
+                        className="navigation-link"
+                        onClick={() => viewRoute(stop)}
+                        aria-label={`Show ${stop.place.name} on the itinerary map`}
+                        aria-controls="itinerary-map"
+                      >
+                        <MapPin size={15} />
+                        Show on map
+                      </button>
+                      <a
+                        className="navigation-link external-navigation-link"
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent([stop.place.name, stop.place.area_name, 'Kochi', 'Kerala'].filter(Boolean).join(', '))}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Get directions from your location to ${stop.place.name} in Google Maps (opens in a new tab)`}
+                      >
+                        View in Google Maps
+                        <ArrowUpRight size={15} />
+                      </a>
+                    </div>
                   </div>
                 </div>
               </article>
@@ -795,7 +820,7 @@ export function ActiveTrip() {
           </div>
         </section>
         <aside className="map-aside">
-          <TripMap stops={day.stops} />
+          <TripMap stops={day.stops} focusRequest={focusRequest} />
           <div className="local-tip">
             <Leaf size={22} />
             <h3>A little local wisdom</h3>

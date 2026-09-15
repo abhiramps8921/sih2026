@@ -765,12 +765,20 @@ progress::-moz-progress-bar {
 }
 .stop-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
+}
+.route-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 .complete-button {
   display: flex;
@@ -806,6 +814,33 @@ progress::-moz-progress-bar {
   gap: 5px;
   font-size: 0.75rem;
   color: #58774a;
+  background: none;
+  border: 0;
+  padding: 10px 12px;
+  min-height: 44px;
+  border-radius: 8px;
+  text-decoration: none;
+  text-align: left;
+}
+.navigation-link svg {
+  flex-shrink: 0;
+}
+.external-navigation-link {
+  background: var(--green);
+  color: white;
+  font-weight: 600;
+}
+.external-navigation-link:hover {
+  background: #244b30;
+  color: white;
+}
+.navigation-link:focus-visible,
+.map-card:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+}
+.navigation-link:not(.external-navigation-link):hover {
+  color: var(--green);
 }
 .local-tip {
   background: #edf3e5;
@@ -1529,6 +1564,11 @@ progress::-moz-progress-bar {
   }
   .stop-actions {
     gap: 8px;
+  }
+  .route-actions {
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
   .complete-button {
     font-size: 0.68rem;
