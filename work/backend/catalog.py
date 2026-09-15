@@ -1,5 +1,9 @@
 """Illustrative citywide Kochi catalog; estimates are not live facts."""
 
+import json
+import re
+from pathlib import Path
+
 REGIONS = [
     {"id": "fort-kochi", "name": "Fort Kochi", "character": "Waterfront heritage and art"},
     {"id": "mattancherry", "name": "Mattancherry", "character": "Markets and layered history"},
@@ -18,6 +22,35 @@ REGIONS = [
     {"id": "kalamassery", "name": "Kalamassery", "character": "Museums and university district"},
     {"id": "willingdon", "name": "Willingdon Island", "character": "Harbour views"},
 ]
+
+_SOURCE_AREA_ALIASES = {
+    "Ernakulam": "ernakulam",
+    "Marine Drive": "ernakulam",
+    "Fort Kochi": "fort-kochi",
+    "Mattancherry": "mattancherry",
+    "Willingdon Island": "willingdon",
+}
+
+
+def _area_id(area):
+    return _SOURCE_AREA_ALIASES.get(area) or re.sub(r"[^a-z0-9]+", "-", area.lower()).strip("-")
+
+
+_SOURCE_PLACES_PATH = Path(__file__).with_name("data") / "kochi_places.json"
+with _SOURCE_PLACES_PATH.open(encoding="utf-8") as source_file:
+    _SOURCE_PLACES = json.load(source_file)
+
+for source_place in _SOURCE_PLACES:
+    if not isinstance(source_place, dict) or not source_place.get("id"):
+        raise ValueError("Every imported Kochi place must be an object with an id")
+    area = source_place.get("area")
+    if not isinstance(area, str) or not area.strip():
+        raise ValueError(f"Imported Kochi place {source_place['id']} has no area")
+    area_id = _area_id(area)
+    if area_id not in {region["id"] for region in REGIONS}:
+        REGIONS.append(
+            {"id": area_id, "name": area, "character": "Imported illustrative demo location"}
+        )
 REGION_IDS = {region["id"] for region in REGIONS}
 REGION_NAMES = {region["id"]: region["name"] for region in REGIONS}
 
@@ -71,6 +104,69 @@ def place(id, name, category, lat, lng, cost, duration, hours, tip, scores, area
         ),
         demo=True,
     )
+
+
+_SOURCE_CATEGORY_MAP = {
+    "restaurants": "Food",
+    "local food": "Food",
+    "street food": "Food",
+    "cafes": "Food",
+    "art": "Art",
+    "shopping": "Shopping",
+    "markets": "Shopping",
+    "heritage": "Culture",
+    "religious": "Culture",
+    "culture": "Culture",
+    "museums": "Culture",
+    "nature": "Nature",
+    "beaches": "Nature",
+    "parks": "Nature",
+    "waterfront": "Nature",
+}
+
+
+def _source_hours(best_time):
+    periods = set(best_time)
+    if periods == {"morning"}:
+        return 8, 14
+    if periods == {"afternoon"}:
+        return 11, 18
+    if periods == {"evening"}:
+        return 16, 22
+    if periods == {"night"}:
+        return 18, 22
+    return 8, 22
+
+
+def _import_source_place(source_place):
+    area_id = _area_id(source_place["area"])
+    opens, closes = _source_hours(source_place["best_time"])
+    category = _SOURCE_CATEGORY_MAP.get(source_place["category"], "Hidden gems")
+    imported = dict(source_place)
+    imported.update(
+        area=area_id,
+        area_name=REGION_NAMES[area_id],
+        lat=source_place["location"]["latitude"],
+        lng=source_place["location"]["longitude"],
+        category=category,
+        source_category=source_place["category"],
+        cost=source_place["estimated_cost_per_person"],
+        price_tier=("premium" if source_place["estimated_cost_per_person"] >= 2500 else "standard"),
+        duration=source_place["average_visit_minutes"],
+        opens=opens,
+        closes=closes,
+        tip=source_place["local_tip"],
+        slh=dict(
+            safety=None,
+            legitimacy=None,
+            hygiene=None,
+            reviews=0,
+            reviewed_at=None,
+            source="No SLH dimensions supplied in source data",
+        ),
+        demo=True,
+    )
+    return imported
 
 
 PLACES = [
@@ -564,6 +660,13 @@ PLACES = [
         "panampilly",
     ),
 ]
+
+_catalog_ids = {catalog_place["id"] for catalog_place in PLACES}
+_imported_places = [_import_source_place(source_place) for source_place in _SOURCE_PLACES]
+if _catalog_ids & {source_place["id"] for source_place in _imported_places}:
+    raise ValueError("Imported Kochi place IDs must not collide with the curated catalog")
+PLACES.extend(_imported_places)
+
 BY_ID = {p["id"]: p for p in PLACES}
 TEMPLATE_STOPS = {
     "slow-kochi": [
