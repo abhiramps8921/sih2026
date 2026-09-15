@@ -209,6 +209,10 @@ export function Planner() {
           </fieldset>
           <fieldset className="tag-fieldset">
             <legend>How many stops in a day?</legend>
+            <p className="field-hint">
+              Your target per day. Visits, travel, opening hours and 20-minute breaks must fit
+              between 09:00 and 22:00.
+            </p>
             <div className="pace-grid">
               {[
                 ['3', '3 stops', 'A slower day', Leaf],
@@ -715,6 +719,11 @@ export function ActiveTrip() {
             <h2>
               {dayIndex === 0 ? 'Let the wandering begin.' : 'Another day, another discovery.'}
             </h2>
+            <p>
+              {day.stops.length} stops scheduled
+              {trip.preferences?.stops_per_day &&
+                ` · ${trip.preferences.stops_per_day} requested per day`}
+            </p>
             <p>
               {money(day.cost)} estimated
               {Number.isFinite(day.budget_utilization) &&

@@ -195,6 +195,11 @@ def generate_plan(preferences, *, excluded=None, requested=None, allow_ai=True):
                     - travel / 5
                     - max(0, start - clock - travel) / 5
                 )
+                if preferences.stops_per_day is not None:
+                    # Explicit counts need time reserved for the remaining visits and breaks.
+                    time_per_slot = max(1, (22 * 60 - clock) / slots_left)
+                    required_time = start - clock + p["duration"] + 20
+                    rank -= 120 * required_time / time_per_slot
                 feasible.append((rank, p, travel, travel_mode, start))
             if not feasible:
                 break
@@ -219,9 +224,12 @@ def generate_plan(preferences, *, excluded=None, requested=None, allow_ai=True):
             raise ValueError(
                 "No feasible stops fit this plan. Increase your budget or lower the SLH filter."
             )
-        if len(stops) < day_target:
+        if len(stops) < target:
             warnings.append(
-                f"Day {day + 1} has fewer stops to respect your budget and available time."
+                f"Day {day + 1}: scheduled {len(stops)} of {target} requested stops. "
+                "The remaining stops could not fit the available places, opening hours, "
+                "visit durations, travel, 20-minute breaks and daily budget. "
+                "Try fewer stops per day, more areas or a higher budget."
             )
         day_cost = spent + 400
         utilization = round(day_cost / budget * 100)

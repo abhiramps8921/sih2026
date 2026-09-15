@@ -95,6 +95,31 @@ def test_twenty_custom_stops_per_day_is_accepted():
     assert Preferences(stops_per_day=20).stops_per_day == 20
 
 
+def test_explicit_count_reserves_time_for_short_visits(monkeypatch):
+    from . import planner
+
+    places = [
+        {**BY_ID["nets"], "id": f"short-{i}", "name": f"Short visit {i}",
+         "duration": 15, "opens": 9, "closes": 22}
+        for i in range(16)
+    ]
+    places.insert(0, {**places[0], "id": "long", "name": "Long visit", "duration": 180})
+    monkeypatch.setattr(planner, "PLACES", places)
+    monkeypatch.setattr(planner, "BY_ID", {p["id"]: p for p in places})
+    plan = generate_plan(Preferences(days=1, budget=4000, stops_per_day=16), allow_ai=False)
+    assert len(plan["days"][0]["stops"]) == 16
+    assert "long" not in {s["place"]["id"] for s in plan["days"][0]["stops"]}
+
+
+def test_shortfall_reports_requested_count_even_when_catalog_is_small():
+    plan = generate_plan(
+        Preferences(days=1, budget=4000, stops_per_day=16, areas=["vyttila"]),
+        allow_ai=False,
+    )
+    count = len(plan["days"][0]["stops"])
+    assert any(f"scheduled {count} of 16 requested stops" in warning for warning in plan["warnings"])
+
+
 def test_planner_schedules_lulu_only_once_across_catalog_aliases():
     plan = generate_plan(
         Preferences(days=2, budget=2000, stops_per_day=5, areas=["edappally"]),
