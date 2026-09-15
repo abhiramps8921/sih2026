@@ -1,20 +1,12 @@
 import json
 
+import httpx
 import pytest
-from fastapi.testclient import TestClient
 
 from . import db
-from .app import Preferences, app
-from .catalog import PLACES, REGIONS
+from .app import Preferences
+from .catalog import BY_ID, PLACES, REGIONS
 from .planner import generate_plan
-
-
-@pytest.fixture
-def client(tmp_path, monkeypatch):
-    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    with TestClient(app) as client:
-        yield client
 
 
 def create_trip(client, **overrides):
@@ -86,6 +78,50 @@ def test_plan_respects_days_budget_hours_and_unique_stops(days, budget, pace):
     assert plan["total_cost"] == sum(d["cost"] for d in plan["days"])
 
 
+@pytest.mark.parametrize("stops_per_day", [3, 5, 7])
+def test_selected_stops_per_day_reaches_trip_creation(client, stops_per_day):
+    trip = create_trip(
+        client,
+        days=1,
+        budget=1500,
+        stops_per_day=stops_per_day,
+    )
+
+    assert len(trip["days"][0]["stops"]) == stops_per_day
+    assert trip["preferences"]["stops_per_day"] == stops_per_day
+
+
+def test_twenty_custom_stops_per_day_is_accepted():
+    assert Preferences(stops_per_day=20).stops_per_day == 20
+
+
+def test_planner_schedules_lulu_only_once_across_catalog_aliases():
+    plan = generate_plan(
+        Preferences(days=2, budget=2000, stops_per_day=5, areas=["edappally"]),
+        requested=["lulu", "lulu_mall"],
+    )
+    stops = [s for day in plan["days"] for s in day["stops"]]
+    assert sum(s["place"]["id"] in {"lulu", "lulu_mall"} for s in stops) == 1
+
+
+@pytest.mark.parametrize("excluded_id", ["lulu", "lulu_mall"])
+def test_excluding_lulu_excludes_its_other_catalog_id(excluded_id):
+    plan = generate_plan(
+        Preferences(days=1, budget=2000, stops_per_day=5, areas=["edappally"]),
+        excluded={excluded_id},
+    )
+    assert not {"lulu", "lulu_mall"} & {
+        s["place"]["id"] for day in plan["days"] for s in day["stops"]
+    }
+
+
+@pytest.mark.parametrize("stops_per_day", [0, 21])
+def test_custom_stops_per_day_must_be_between_one_and_twenty(client, stops_per_day):
+    response = client.post("/api/trips", json={"stops_per_day": stops_per_day})
+
+    assert response.status_code == 422
+
+
 def test_catalog_covers_citywide_kochi_regions():
     supported = {region["id"] for region in REGIONS}
     represented = {place["area"] for place in PLACES}
@@ -152,6 +188,30 @@ def test_completion_is_idempotent_persists_and_can_be_undone(client):
     assert client.get("/api/me").json()["points"] == 0
 
 
+def test_completed_places_are_stored_in_visited_history(client):
+    trip = create_trip(client, days=1, stops_per_day=1)
+    stop = trip["days"][0]["stops"][0]
+
+    client.put(
+        f"/api/trips/{trip['id']}/stops/{stop['id']}", json={"completed": True}
+    )
+
+    assert client.get("/api/me").json()["visited_places"] == [stop["place"]["id"]]
+
+
+def test_new_places_only_excludes_visited_places(client):
+    first = create_trip(client, days=1, stops_per_day=1)
+    first_stop = first["days"][0]["stops"][0]
+    client.put(
+        f"/api/trips/{first['id']}/stops/{first_stop['id']}", json={"completed": True}
+    )
+
+    fresh = create_trip(client, days=1, stops_per_day=1, include_visited=False)
+
+    assert fresh["days"][0]["stops"][0]["place"]["id"] != first_stop["place"]["id"]
+    assert fresh["preferences"]["include_visited"] is False
+
+
 def test_saved_pre_area_trip_data_is_enriched_on_read(client):
     trip = create_trip(client)
     with db.connect() as connection:
@@ -171,6 +231,36 @@ def test_saved_pre_area_trip_data_is_enriched_on_read(client):
     assert first["travel_mode"] == "walk"
     assert first["place"]["area"]
     assert first["place"]["area_name"]
+
+
+def test_unstarted_saved_trip_with_duplicate_venue_aliases_is_repaired(client):
+    trip = create_trip(client, days=1, budget=2000, stops_per_day=5)
+    with db.connect() as connection:
+        row = connection.execute(
+            "SELECT plan FROM trips WHERE id=?", (trip["id"],)
+        ).fetchone()
+        plan = json.loads(row["plan"])
+        duplicate_ids = ["kashi", "kashi_art_cafe"]
+        for stop, place_id in zip(plan["days"][0]["stops"][:2], duplicate_ids):
+            stop["id"] = f"d1-{place_id}"
+            stop["place"] = BY_ID[place_id]
+        connection.execute(
+            "UPDATE trips SET plan=? WHERE id=?",
+            (json.dumps(plan), trip["id"]),
+        )
+
+    restored = client.get(f"/api/trips/{trip['id']}").json()
+    restored_ids = [stop["place"]["id"] for stop in restored["days"][0]["stops"]]
+
+    assert len(restored_ids) == 5
+    assert sum(place_id in {"kashi", "kashi_art_cafe"} for place_id in restored_ids) == 1
+    with db.connect() as connection:
+        stored = json.loads(
+            connection.execute(
+                "SELECT plan FROM trips WHERE id=?", (trip["id"],)
+            ).fetchone()["plan"]
+        )
+    assert [stop["place"]["id"] for stop in stored["days"][0]["stops"]] == restored_ids
 
 
 def test_day_bonus_awarded_once(client):
@@ -248,15 +338,6 @@ def test_foreign_origin_cannot_mutate(client):
         client.post("/api/trips", json={}, headers={"Origin": "https://example.com"}).status_code
         == 403
     )
-
-
-def test_demo_group_request_is_idempotent(client):
-    for _ in range(2):
-        assert client.put("/api/groups/sunrise", json={"saved": True}).status_code == 200
-    group = client.get("/api/groups").json()[0]
-    assert group["demo"] is True
-    assert group["status"] == "pending"
-    assert group["members"] == 3
 
 
 def test_stop_removal_updates_cost_and_preserves_other_stops(client):
@@ -379,6 +460,41 @@ def test_gemini_story_extraction_uses_structured_output(monkeypatch):
     assert captured["url"].endswith("/v1beta/interactions")
     assert captured["headers"]["x-goog-api-key"] == "test-key"
     assert captured["body"]["response_format"]["mime_type"] == "application/json"
+
+
+def test_trip_uses_ai_candidate_and_ranking_pipeline_when_available(monkeypatch):
+    from . import ai
+
+    monkeypatch.setattr(
+        ai,
+        "generate_candidates",
+        lambda _: [ai.Candidate(name="Chinese Fishing Nets", category="Nature", reason="Waterfront")],
+    )
+    monkeypatch.setattr(ai, "rerank_places", lambda _, places: [places[0]["id"]])
+
+    plan = generate_plan(Preferences(days=1, budget=1500, stops_per_day=1))
+
+    assert plan["recommendation_mode"] == "ai"
+
+
+@pytest.mark.parametrize("failure", ["missing", "invalid", "quota", "timeout", "malformed"])
+def test_trip_falls_back_for_all_gemini_failures(monkeypatch, failure):
+    from . import ai
+
+    if failure == "missing":
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    elif failure == "malformed":
+        monkeypatch.setattr(ai, "generate_candidates", lambda _: (_ for _ in ()).throw(ai.GeminiUnavailableError("bad JSON")))
+    else:
+        error = httpx.TimeoutException("timeout") if failure == "timeout" else httpx.HTTPStatusError(
+            failure, request=httpx.Request("POST", "https://example.test"), response=httpx.Response(429 if failure == "quota" else 401)
+        )
+        monkeypatch.setattr(ai, "generate_candidates", lambda _: (_ for _ in ()).throw(error))
+
+    plan = generate_plan(Preferences(days=1, budget=1500, stops_per_day=1))
+
+    assert plan["recommendation_mode"] == "fallback"
+    assert plan["days"][0]["stops"]
 
 
 def test_extreme_dates_are_validation_errors(client):

@@ -11,9 +11,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-from . import ai, auth, db
+from . import ai, auth, db, groups
 from .catalog import BY_ID, PLACES, REGION_IDS, REGIONS, TEMPLATE_STOPS
-from .planner import generate_plan
+from .planner import generate_plan, venue_key
 
 
 @asynccontextmanager
@@ -24,6 +24,7 @@ async def lifespan(app):
 
 app = FastAPI(title="Roam local travel API", lifespan=lifespan)
 app.include_router(auth.router)
+app.include_router(groups.router)
 FRONTEND_DIST = Path(__file__).resolve().parents[1] / "dist"
 
 
@@ -81,10 +82,13 @@ class Preferences(BaseModel):
     )
     areas: list[str] = Field(default_factory=list, max_length=12)
     pace: Literal["relaxed", "balanced", "packed"] = "balanced"
+    stops_per_day: int | None = Field(default=None, ge=1, le=20)
+    travel_type: Literal["family", "group", "solo"] | None = None
     start_date: date = Field(default_factory=date.today)
     min_slh: int = Field(default=0, ge=0, le=100)
     template_id: str | None = Field(default=None, max_length=80)
     title: str = Field(default="", max_length=100)
+    include_visited: bool = True
 
     @field_validator("start_date")
     @classmethod
@@ -130,6 +134,26 @@ class DraftTrip(Preferences):
     draft_id: str = Field(min_length=1, max_length=100)
 
 
+def unique_venue_ids(place_ids):
+    unique_ids = []
+    seen = set()
+    for place_id in place_ids:
+        key = venue_key(BY_ID[place_id])
+        if key not in seen:
+            unique_ids.append(place_id)
+            seen.add(key)
+    return unique_ids
+
+
+def visited_place_ids(connection, owner):
+    return {
+        row["place"]
+        for row in connection.execute(
+            "SELECT place FROM visited_places WHERE owner=?", (owner,)
+        )
+    }
+
+
 def load_trip(connection, trip_id, owner):
     row = connection.execute(
         "SELECT plan FROM trips WHERE id=? AND owner=?", (trip_id, owner)
@@ -141,6 +165,38 @@ def load_trip(connection, trip_id, owner):
         r["stop"]
         for r in connection.execute("SELECT stop FROM completions WHERE trip=?", (trip_id,))
     }
+    places = [stop["place"] for day in plan["days"] for stop in day["stops"]]
+    keys = [venue_key(place) for place in places]
+    if not completed and len(keys) != len(set(keys)):
+        requested = []
+        requested_keys = set()
+        for place in places:
+            key = venue_key(place)
+            if key not in requested_keys:
+                requested.append(place["id"])
+                requested_keys.add(key)
+        preferences = Preferences(**plan["preferences"])
+        excluded = set(plan.get("excluded_places", []))
+        if not preferences.include_visited:
+            excluded.update(visited_place_ids(connection, owner))
+        repaired = generate_plan(
+            preferences,
+            excluded=excluded,
+            requested=requested,
+            allow_ai=False,
+        )
+        repaired_keys = [
+            venue_key(stop["place"])
+            for day in repaired["days"]
+            for stop in day["stops"]
+        ]
+        if len(repaired_keys) != len(set(repaired_keys)):
+            raise RuntimeError("Planner returned duplicate venues while repairing a saved trip")
+        plan = {**plan, **repaired}
+        connection.execute(
+            "UPDATE trips SET plan=? WHERE id=? AND owner=?",
+            (json.dumps(plan), trip_id, owner),
+        )
     for day in plan["days"]:
         for stop in day["stops"]:
             current_place = BY_ID.get(stop["place"]["id"])
@@ -168,7 +224,7 @@ def config():
         "ai_enabled": ai.enabled(),
         "ai_provider": "Gemini",
         "city": "Kochi",
-        "social_mode": "demo",
+        "social_mode": "direct_join",
     }
 
 
@@ -212,6 +268,7 @@ def me(request: Request):
             badges=badges,
             saved=saved,
             trips=trips,
+            visited_places=sorted(visited_place_ids(connection, request.state.owner)),
         )
 
 
@@ -219,12 +276,17 @@ def me(request: Request):
 def create_trip(preferences: Preferences, request: Request):
     if preferences.template_id and preferences.template_id not in TEMPLATE_STOPS:
         raise HTTPException(422, "Choose an available itinerary template.")
-    try:
-        plan = generate_plan(preferences)
-    except ValueError as exc:
-        raise HTTPException(422, str(exc)) from exc
     id = secrets.token_urlsafe(12)
     with db.connect() as connection:
+        excluded = (
+            set()
+            if preferences.include_visited
+            else visited_place_ids(connection, request.state.owner)
+        )
+        try:
+            plan = generate_plan(preferences, excluded=excluded)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
         connection.execute(
             "INSERT INTO trips(id,owner,plan) VALUES (?,?,?)",
             (id, request.state.owner, json.dumps(plan)),
@@ -254,6 +316,8 @@ def edit_trip(trip_id: str, change: EditTrip, request: Request):
         preferences = Preferences(**plan["preferences"])
         if change.action == "replace":
             excluded = set(plan.get("excluded_places", [])) | {selected["place"]["id"]}
+            if not preferences.include_visited:
+                excluded |= visited_place_ids(connection, request.state.owner)
             try:
                 revised = generate_plan(
                     preferences,
@@ -323,6 +387,16 @@ def complete(trip_id: str, stop_id: str, change: Completion, request: Request):
                 "INSERT OR IGNORE INTO completions(trip,stop) VALUES (?,?)",
                 (trip_id, stop_id),
             )
+            place_id = next(
+                stop["place"]["id"]
+                for day in plan["days"]
+                for stop in day["stops"]
+                if stop["id"] == stop_id
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO visited_places(owner,place) VALUES (?,?)",
+                (request.state.owner, place_id),
+            )
         else:
             connection.execute(
                 "DELETE FROM completions WHERE trip=? AND stop=?", (trip_id, stop_id)
@@ -350,11 +424,14 @@ def bookmark(template_id: str, change: BookmarkChange, request: Request):
 
 @app.post("/api/drafts", status_code=201)
 def draft(payload: DraftInput, request: Request):
-    found = [
-        p["id"]
-        for p in PLACES
-        if p["name"].lower() in payload.notes.lower() or p["id"] in payload.notes.lower().split()
-    ]
+    found = unique_venue_ids(
+        [
+            p["id"]
+            for p in PLACES
+            if p["name"].lower() in payload.notes.lower()
+            or p["id"] in payload.notes.lower().split()
+        ]
+    )
     content = dict(
         title=payload.title,
         notes=payload.notes,
@@ -367,7 +444,7 @@ def draft(payload: DraftInput, request: Request):
         try:
             extraction = ai.extract_story(payload.notes)
             content.update(
-                place_ids=extraction.place_ids,
+                place_ids=unique_venue_ids(extraction.place_ids),
                 summary=extraction.summary,
                 unresolved=extraction.unresolved,
                 method="AI-assisted extraction · contributor review required",
@@ -410,7 +487,11 @@ def edit_draft(draft_id: str, payload: DraftUpdate, request: Request):
         ).fetchone()
         if not row:
             raise HTTPException(404, "Draft not found.")
-        content = {**json.loads(row["content"]), **payload.model_dump()}
+        content = {
+            **json.loads(row["content"]),
+            **payload.model_dump(),
+            "place_ids": unique_venue_ids(payload.place_ids),
+        }
         connection.execute(
             "UPDATE drafts SET content=? WHERE id=?", (json.dumps(content), draft_id)
         )
@@ -433,7 +514,14 @@ def schedule_draft(payload: DraftTrip, request: Request):
             **{**payload.model_dump(exclude={"draft_id"}), "title": content["title"]}
         )
         try:
-            plan = generate_plan(preferences, requested=content["place_ids"])
+            excluded = (
+                set()
+                if preferences.include_visited
+                else visited_place_ids(connection, request.state.owner)
+            )
+            plan = generate_plan(
+                preferences, excluded=excluded, requested=content["place_ids"]
+            )
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
         plan["source_draft"] = payload.draft_id
@@ -443,65 +531,6 @@ def schedule_draft(payload: DraftTrip, request: Request):
             (id, request.state.owner, json.dumps(plan)),
         )
     return {**plan, "id": id}
-
-
-GROUPS = [
-    dict(
-        id="sunrise",
-        title="A slow morning in Fort Kochi",
-        date="2026-10-03",
-        time="09:00",
-        place="Chinese Fishing Nets",
-        members=3,
-        capacity=6,
-        tags=["Photography", "Easy pace"],
-        host="Ananya",
-        initials="AM",
-    ),
-    dict(
-        id="food-walk",
-        title="Good food, better company",
-        date="2026-10-04",
-        time="12:00",
-        place="Mattancherry Palace entrance",
-        members=4,
-        capacity=6,
-        tags=["Food", "Culture"],
-        host="Meera",
-        initials="MK",
-    ),
-]
-
-
-@app.get("/api/groups")
-def groups(request: Request):
-    with db.connect() as connection:
-        requests = {
-            r["departure"]: r["status"]
-            for r in connection.execute(
-                "SELECT departure,status FROM group_requests WHERE owner=?",
-                (request.state.owner,),
-            )
-        }
-    return [{**g, "status": requests.get(g["id"]), "demo": True} for g in GROUPS]
-
-
-@app.put("/api/groups/{group_id}")
-def join_group(group_id: str, change: BookmarkChange, request: Request):
-    if group_id not in {g["id"] for g in GROUPS}:
-        raise HTTPException(404, "Departure not found.")
-    with db.connect() as connection:
-        if change.saved:
-            connection.execute(
-                "INSERT OR IGNORE INTO group_requests(owner,departure) VALUES (?,?)",
-                (request.state.owner, group_id),
-            )
-        else:
-            connection.execute(
-                "DELETE FROM group_requests WHERE owner=? AND departure=?",
-                (request.state.owner, group_id),
-            )
-    return {"status": "pending" if change.saved else None, "demo": True}
 
 
 @app.get("/{path:path}", include_in_schema=False)
