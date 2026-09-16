@@ -68,6 +68,7 @@ export function Planner() {
         start_date: form.get('date'),
         travel_type: selectedTravelType(params),
         interests: tags,
+        custom_request: form.get('custom_request'),
         areas,
         stops_per_day: Number(stopChoice === 'custom' ? customStops : stopChoice),
         min_slh: Number(form.get('slh')),
@@ -289,6 +290,16 @@ export function Planner() {
               <option value="90">90+ — highest sample ratings</option>
             </select>
             <small>SLH ratings are illustrative demo data, not guarantees.</small>
+          </label>
+          <label className="field">
+            Describe the kind of trip you want (optional)
+            <textarea
+              name="custom_request"
+              maxLength={2000}
+              rows={3}
+              placeholder="A relaxed trip with local food and somewhere nice for sunset..."
+            />
+            <small>When AI is available, your preferences help shape the itinerary.</small>
           </label>
           <ErrorNotice error={error} />
           <button className="button dark full" disabled={busy}>
@@ -740,13 +751,15 @@ export function ActiveTrip() {
               {money(day.cost)} estimated
               {Number.isFinite(day.budget_utilization) &&
                 ` · ${day.budget_utilization}% of daily budget`}{' '}
-              · Area-clustered route · 20-minute breaks
+              {day.area_clustered && '· Area-clustered route '}· 20-minute breaks
             </p>
           </div>
           <div className="timeline">
             {day.stops.map((stop, i) => (
               <article className={`stop-card ${stop.completed ? 'is-complete' : ''}`} key={stop.id}>
-                <span className="stop-number">{stop.completed ? <Check size={16} /> : i + 1}</span>
+                <span className="stop-number">
+                  {stop.completed ? <Check size={16} /> : (stop.number ?? i + 1)}
+                </span>
                 <div className="stop-body">
                   <div className="stop-heading">
                     <span className="stop-time">

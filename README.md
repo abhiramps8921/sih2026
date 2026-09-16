@@ -43,11 +43,15 @@ npm run dev
 
 On macOS/Linux use `.venv/bin/python` instead. The combined start script handles both paths automatically. Stop existing servers before starting another instance; the frontend intentionally uses strict port 5173.
 
+## Validated itinerary planning
+
+Itinerary generation now uses AI candidate discovery, Python filtering and distance estimates, AI scheduling, deterministic validation, one repair attempt, and a validated offline fallback. An optional written request lets AI interpret trip preferences. Replacement validates a local repair, and map/cards share canonical stop numbering. See [architecture, changed files, tests and presentation notes](work/docs/ITINERARY_ARCHITECTURE.md).
+
 ## Optional AI
 
 Copy `work/.env.example` to `work/.env`, fill `GEMINI_API_KEY` locally and optionally set `GEMINI_MODEL`. The combined start command loads this file. For separate terminals, export these variables in the Python terminal. Restart the backend after changes.
 
-The contribution form then offers an explicit opt-in checkbox. Only submitted story text and the public place catalog are sent to Google. Keys never reach the frontend. The adapter uses the [Gemini Interactions API structured-output format](https://ai.google.dev/gemini-api/docs/structured-output?lang=rest), validates returned IDs against the catalog and retains a local fallback. A live paid API request has not been exercised in this build.
+The itinerary planner automatically uses Gemini when configured, sending trip preferences (including the optional written request) and public catalog data. The contribution form separately offers an explicit opt-in checkbox for story extraction. Keys never reach the frontend. The adapter uses the [Gemini Interactions API structured-output format](https://ai.google.dev/gemini-api/docs/structured-output?lang=rest), validates returned IDs against the catalog and retains a local fallback. A live paid API request has not been exercised in this build.
 
 ## Deploy on Render
 

@@ -19,15 +19,15 @@ export default function TripMap({ stops, focusRequest }) {
     const points = stops.map((s) => [s.place.lat, s.place.lng]);
     const markers = stops.map((stop, index) => {
       const popup = document.createElement('span');
-      popup.textContent = `${index + 1}. ${stop.place.name}`;
+      popup.textContent = `${stop.number ?? index + 1}. ${stop.place.name}`;
       return L.marker(points[index], {
         icon: L.divIcon({
           className: 'number-pin',
-          html: `<span>${index + 1}</span>`,
+          html: `<span>${stop.number ?? index + 1}</span>`,
           iconSize: [30, 30],
           iconAnchor: [15, 15],
         }),
-        title: `${index + 1}. ${stop.place.name}`,
+        title: `${stop.number ?? index + 1}. ${stop.place.name}`,
       })
         .bindPopup(popup)
         .addTo(map);

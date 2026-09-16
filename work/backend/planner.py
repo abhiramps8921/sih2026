@@ -1,60 +1,27 @@
 import logging
 import math
-import re
-import unicodedata
 from datetime import timedelta
-from difflib import SequenceMatcher
 
 from . import ai
 from .catalog import BY_ID, PLACES, TEMPLATE_STOPS, slh_score
+from .planning_rules import (
+    MAX_DAY_DIAMETER_KM,
+    MAX_LEG_KM,
+    _normalise_name,
+    canonical_days,
+    distance_km,
+    filter_places,
+    geographic_context,
+    meal_start,
+    raw_itinerary,
+    refresh_totals,
+    time_label,
+    travel_estimate,
+    validate_itinerary,
+    venue_key,
+)
 
 logger = logging.getLogger(__name__)
-
-
-def travel_estimate(a, b):
-    """Return a conservative city travel estimate, not live routing."""
-    lat1, lat2 = math.radians(a["lat"]), math.radians(b["lat"])
-    dlat = lat2 - lat1
-    dlng = math.radians(b["lng"] - a["lng"])
-    distance = (
-        6371
-        * 2
-        * math.asin(
-            min(
-                1,
-                math.sqrt(
-                    math.sin(dlat / 2) ** 2
-                    + math.cos(lat1) * math.cos(lat2) * math.sin(dlng / 2) ** 2
-                ),
-            )
-        )
-    )
-    road_distance = distance * 1.3
-    if road_distance <= 2:
-        return max(10, math.ceil(road_distance / 4 * 60)), "walk"
-    return max(15, math.ceil(road_distance / 22 * 60) + 8), "local transit"
-
-
-def travel_minutes(a, b):
-    return travel_estimate(a, b)[0]
-
-
-def time_label(minutes):
-    return f"{minutes // 60:02d}:{minutes % 60:02d}"
-
-
-def _normalise_name(value):
-    value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode()
-    return re.sub(r"[^a-z0-9]+", "", value.lower())
-
-
-def venue_key(place):
-    catalog_place = BY_ID.get(place.get("id"), {})
-    area = place.get("area") or catalog_place.get("area")
-    name = place.get("name") or catalog_place.get("name")
-    if not area or not name:
-        raise ValueError("A venue needs an area and name for itinerary deduplication")
-    return area, _normalise_name(name)
 
 
 def _match_candidate_names(candidates, available):
@@ -69,13 +36,7 @@ def _match_candidate_names(candidates, available):
                 max(exact, key=lambda place: ("local_rating" in place, "worth_it_score" in place))
             )
             continue
-        best = max(
-            available,
-            key=lambda place: SequenceMatcher(None, target, _normalise_name(place["name"])).ratio(),
-            default=None,
-        )
-        if best and SequenceMatcher(None, target, _normalise_name(best["name"])).ratio() >= 0.78:
-            matches.append(best)
+        logger.info("[FILTER] Removed %s: no exact local catalog match", candidate.name)
     return list({place["id"]: place for place in matches}.values())
 
 
@@ -118,61 +79,8 @@ def _eligible_places(preferences, excluded):
     ]
 
 
-def _rank_places(preferences, available, chosen_ids, *, allow_ai=True):
-    """Use Gemini only as a ranking signal; local score remains the safe baseline."""
-    local_ranked = sorted(
-        available,
-        key=lambda place: (
-            fallback_score(place, preferences, requested=place["id"] in chosen_ids),
-            place["id"],
-        ),
-        reverse=True,
-    )
-    if not allow_ai:
-        return local_ranked, "fallback"
-    try:
-        ai_candidates = _match_candidate_names(ai.generate_candidates(preferences), available)
-        if not ai_candidates:
-            raise ai.GeminiUnavailableError("Gemini candidates did not match the local catalog")
-        ai_ids = ai.rerank_places(preferences, ai_candidates)
-        ai_order = {place_id: len(ai_ids) - index for index, place_id in enumerate(ai_ids)}
-        # Keep local candidates Gemini omitted so itinerary feasibility is never compromised.
-        ranked = sorted(
-            available,
-            key=lambda place: (
-                fallback_score(place, preferences, requested=place["id"] in chosen_ids)
-                + ai_order.get(place["id"], 0) * 4,
-                place["id"],
-            ),
-            reverse=True,
-        )
-        return ranked, "ai"
-    except ai.GeminiUnavailableError:
-        return local_ranked, "fallback"
-    except Exception:
-        logger.exception(
-            "Gemini recommendation failed unexpectedly. Falling back to local recommendation engine."
-        )
-        return local_ranked, "fallback"
-
-
-def generate_plan(preferences, *, excluded=None, requested=None, allow_ai=True):
+def _fallback_plan(preferences, candidates, chosen_ids):
     budget = preferences.budget
-    chosen_ids = requested or TEMPLATE_STOPS.get(preferences.template_id, [])
-    excluded = set(excluded or [])
-    excluded_venues = {venue_key(BY_ID[id]) for id in excluded if id in BY_ID}
-    excluded.update(p["id"] for p in PLACES if venue_key(p) in excluded_venues)
-    available = _eligible_places(preferences, excluded)
-    # Catalog imports can describe a curated venue under a different ID.
-    venues = {}
-    for place in available:
-        key = venue_key(place)
-        if key not in venues or (place["id"] in chosen_ids and venues[key]["id"] not in chosen_ids):
-            venues[key] = place
-    available = list(venues.values())
-    candidates, recommendation_mode = _rank_places(
-        preferences, available, chosen_ids, allow_ai=allow_ai
-    )
     used, days, warnings = set(), [], []
     target = preferences.stops_per_day
     if target is None:
@@ -189,7 +97,11 @@ def generate_plan(preferences, *, excluded=None, requested=None, allow_ai=True):
             ideal_cost = max(0, (budget - 400 - spent) / slots_left)
             for p in remaining:
                 travel, travel_mode = travel_estimate(previous, p) if previous else (0, "start")
-                start = max(clock + travel, p["opens"] * 60)
+                start = meal_start(p, max(clock + travel, p["opens"] * 60))
+                if previous and distance_km(previous, p) > MAX_LEG_KM:
+                    continue
+                if stops and any(distance_km(s["place"], p) > MAX_DAY_DIAMETER_KM for s in stops):
+                    continue
                 # Reserve food + local transport per day, outside each stop's cost.
                 if spent + p["cost"] + 400 > budget or start + p["duration"] > min(
                     22 * 60, p["closes"] * 60
@@ -209,7 +121,7 @@ def generate_plan(preferences, *, excluded=None, requested=None, allow_ai=True):
                     + (18 if previous and previous["area"] == p["area"] else 0)
                     + fallback_score(p, preferences, requested=p["id"] in chosen_ids) / 4
                     - sum(stop["place"]["category"] == p["category"] for stop in stops) * 12
-                    - travel / 5
+                    - travel * 2
                     - max(0, start - clock - travel) / 5
                 )
                 if preferences.stops_per_day is not None:
@@ -278,12 +190,139 @@ def generate_plan(preferences, *, excluded=None, requested=None, allow_ai=True):
         total_cost=sum(d["cost"] for d in days),
         budget_utilization=round(sum(d["cost"] for d in days) / (budget * preferences.days) * 100),
         warnings=warnings,
-        method=(
-            "Gemini-assisted local planner"
-            if recommendation_mode == "ai"
-            else "Rule-based local planner"
-        ),
-        recommendation_mode=recommendation_mode,
+        method="Rule-based local planner",
+        recommendation_mode="fallback",
         routing="Estimated walking or local-transit time; map lines are not road directions",
         cost_note="Per person. The planner aims to use the available daily budget without exceeding it and includes ₹400/day for food and local transport. Stay and travel to Kochi are excluded. Venue prices and hours are sample estimates.",
+    )
+
+
+def generate_plan(preferences, *, excluded=None, requested=None, allow_ai=True):
+    chosen_ids = requested or TEMPLATE_STOPS.get(preferences.template_id, [])
+    excluded = set(excluded or []) | set(preferences.excluded_place_ids)
+    available = filter_places(_eligible_places(preferences, excluded), preferences, excluded)
+    local = sorted(
+        available,
+        key=lambda p: (fallback_score(p, preferences, requested=p["id"] in chosen_ids), p["id"]),
+        reverse=True,
+    )
+    discovered = []
+    if allow_ai:
+        try:
+            suggestions = ai.generate_candidates(preferences)
+            logger.info("[PLANNER] Generated %s candidates", len(suggestions))
+            discovered = _match_candidate_names(suggestions, available)
+        except Exception:
+            logger.warning("[PLANNER] Candidate discovery unavailable; using local catalog")
+    # Leave room for alternatives; keep the full catalog for offline feasibility.
+    target = (
+        preferences.stops_per_day or {"relaxed": 3, "balanced": 4, "packed": 5}[preferences.pace]
+    )
+    shortlist = list(
+        {
+            p["id"]: p for p in [p for p in local if p["id"] in chosen_ids] + discovered + local
+        }.values()
+    )[: min(60, max(15, target * preferences.days * 3))]
+    if allow_ai:
+        context = geographic_context(shortlist)
+        context["requested_place_ids"] = chosen_ids
+        attempted, errors = None, None
+        for attempt in range(2):
+            try:
+                logger.info(
+                    "[%s] Sent %s candidates",
+                    "AI-REPAIR" if attempt else "AI-PLANNER",
+                    len(shortlist),
+                )
+                attempted = ai.plan_itinerary(
+                    preferences, shortlist, context, attempted=attempted, errors=errors
+                )
+                parsed, errors = validate_itinerary(attempted, shortlist, preferences)
+                if not errors:
+                    plan = {
+                        "title": preferences.title or "Your little Kochi escape",
+                        "city": "Kochi",
+                        "preferences": preferences.model_dump(mode="json"),
+                        "days": canonical_days(parsed, shortlist, preferences),
+                        "routing": "Estimated walking or local-transit time; map lines are not road directions",
+                        "cost_note": "Per person; includes 400 INR/day for food and local transport. Venue prices and hours are sample estimates. Stay and travel to Kochi excluded.",
+                    }
+                    plan["method"] = "Validated AI itinerary planner"
+                    plan["recommendation_mode"] = "ai"
+                    plan["warnings"] = [
+                        f"Day {d.day}: scheduled {len(d.stops)} of {target} requested stops within the constraints."
+                        for d in parsed.days
+                        if len(d.stops) < target
+                    ]
+                    plan["planning_source"] = "ai_repair" if attempt else "ai"
+                    logger.info("[PLANNER] AI %s successful", "repair" if attempt else "planning")
+                    return refresh_totals(plan)
+            except ai.GeminiUnavailableError:
+                logger.warning("[FALLBACK] AI unavailable; using deterministic planner")
+                break
+            except Exception:
+                logger.exception("[FALLBACK] Unexpected AI failure; using deterministic planner")
+                break
+    fallback = _fallback_plan(preferences, local, chosen_ids)
+    parsed, errors = validate_itinerary(raw_itinerary(fallback), local, preferences)
+    # A constrained fallback can legitimately have fewer stops, with an existing user warning.
+    serious = [error for error in errors if error["type"] != "TOO_FEW_STOPS"]
+    if serious:
+        raise ValueError(
+            "No valid itinerary fits these constraints. Try more areas or a higher budget."
+        )
+    fallback["planning_source"] = "fallback"
+    logger.info("[FALLBACK] Validated deterministic itinerary")
+    return refresh_totals(fallback)
+
+
+def replace_stop(plan, selected, preferences, excluded):
+    """Try nearby alternatives in place, preserving all other stops and days."""
+    from copy import deepcopy
+
+    occupied = {s["place"]["id"] for d in plan["days"] for s in d["stops"]}
+    candidates = filter_places(
+        _eligible_places(preferences, excluded | occupied), preferences, excluded | occupied
+    )
+    candidates.sort(
+        key=lambda p: (
+            distance_km(selected["place"], p) - fallback_score(p, preferences) / 100,
+            p["id"],
+        )
+    )
+    for candidate in candidates:
+        revised = deepcopy(plan)
+        for day in revised["days"]:
+            if not any(s["id"] == selected["id"] for s in day["stops"]):
+                continue
+            previous, clock = None, 540
+            for stop in day["stops"]:
+                if stop["id"] == selected["id"]:
+                    stop.update(
+                        id=f"d{day['day']}-{candidate['id']}", place=candidate, purpose="visit"
+                    )
+                p = stop["place"]
+                travel, mode = travel_estimate(previous, p) if previous else (0, "start")
+                # Preserve intentional meal/sunset times when shifting later stops.
+                from .planning_rules import minutes
+
+                start = meal_start(p, max(clock + travel, p["opens"] * 60, minutes(stop["start"])))
+                stop.update(
+                    start=time_label(start),
+                    end=time_label(start + p["duration"]),
+                    travel_minutes=travel,
+                    travel_mode=mode,
+                )
+                previous, clock = p, start + p["duration"] + 20
+        allowed = [s["place"] for d in revised["days"] for s in d["stops"]]
+        _, errors = validate_itinerary(raw_itinerary(revised), allowed, preferences)
+        if not errors:
+            revised["excluded_places"] = sorted(excluded)
+            revised["method"] = "Validated local route repair"
+            revised["planning_source"] = "local_repair"
+            revised["recommendation_mode"] = "fallback"
+            revised["warnings"] = []
+            return refresh_totals(revised)
+    raise ValueError(
+        "No replacement fits this day's route, hours and budget. Your original plan is unchanged."
     )

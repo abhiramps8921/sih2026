@@ -509,7 +509,7 @@ def test_gemini_story_extraction_uses_structured_output(monkeypatch):
     assert captured["body"]["response_format"]["mime_type"] == "application/json"
 
 
-def test_trip_uses_ai_candidate_and_ranking_pipeline_when_available(monkeypatch):
+def test_trip_uses_ai_candidate_and_planning_pipeline_when_available(monkeypatch):
     from . import ai
 
     monkeypatch.setattr(
@@ -519,7 +519,26 @@ def test_trip_uses_ai_candidate_and_ranking_pipeline_when_available(monkeypatch)
             ai.Candidate(name="Chinese Fishing Nets", category="Nature", reason="Waterfront")
         ],
     )
-    monkeypatch.setattr(ai, "rerank_places", lambda _, places: [places[0]["id"]])
+    monkeypatch.setattr(
+        ai,
+        "plan_itinerary",
+        lambda *_args, **_kwargs: {
+            "days": [
+                {
+                    "day": 1,
+                    "theme": "Waterfront",
+                    "stops": [
+                        {
+                            "place_id": "nets",
+                            "start_time": "09:00",
+                            "end_time": "10:00",
+                            "purpose": "sightseeing",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
 
     plan = generate_plan(Preferences(days=1, budget=1500, stops_per_day=1))
 

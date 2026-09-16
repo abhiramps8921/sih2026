@@ -13,7 +13,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from . import ai, auth, db, groups
 from .catalog import BY_ID, PLACES, REGION_IDS, REGIONS, TEMPLATE_STOPS
-from .planner import generate_plan, venue_key
+from .planner import generate_plan, replace_stop, venue_key
+from .planning_rules import raw_itinerary, refresh_totals, validate_itinerary
 
 
 @asynccontextmanager
@@ -89,6 +90,9 @@ class Preferences(BaseModel):
     template_id: str | None = Field(default=None, max_length=80)
     title: str = Field(default="", max_length=100)
     include_visited: bool = True
+    custom_request: str = Field(default="", max_length=2000)
+    excluded_place_ids: list[str] = Field(default_factory=list, max_length=200)
+    allow_day_trips: bool = False
 
     @field_validator("start_date")
     @classmethod
@@ -315,11 +319,7 @@ def edit_trip(trip_id: str, change: EditTrip, request: Request):
             if not preferences.include_visited:
                 excluded |= visited_place_ids(connection, request.state.owner)
             try:
-                revised = generate_plan(
-                    preferences,
-                    excluded=excluded,
-                    requested=[s["place"]["id"] for s in all_stops if s["id"] != change.stop_id],
-                )
+                revised = replace_stop(plan, selected, preferences, excluded)
             except ValueError as exc:
                 raise HTTPException(422, str(exc)) from exc
             old_ids = {s["place"]["id"] for s in all_stops}
@@ -333,41 +333,28 @@ def edit_trip(trip_id: str, change: EditTrip, request: Request):
             revised["excluded_places"] = sorted(excluded)
             plan = revised
         else:
-            from .planner import time_label, travel_estimate
-
             for day in plan["days"]:
                 if not any(s["id"] == change.stop_id for s in day["stops"]):
                     continue
                 if len(day["stops"]) == 1:
                     raise HTTPException(422, "Keep at least one stop in each day.")
                 day["stops"] = [s for s in day["stops"] if s["id"] != change.stop_id]
+                from .planning_rules import travel_estimate
+
                 previous = None
-                clock = 9 * 60
                 for stop in day["stops"]:
-                    travel, travel_mode = (
+                    travel, mode = (
                         travel_estimate(previous, stop["place"]) if previous else (0, "start")
                     )
-                    start = max(clock + travel, stop["place"]["opens"] * 60)
-                    end = start + stop["place"]["duration"]
-                    if end > min(22 * 60, stop["place"]["closes"] * 60):
-                        raise HTTPException(
-                            422,
-                            "Removing this stop would make the remaining route infeasible. Your original plan is unchanged.",
-                        )
-                    stop.update(
-                        start=time_label(start),
-                        end=time_label(end),
-                        travel_minutes=travel,
-                        travel_mode=travel_mode,
-                    )
+                    stop.update(travel_minutes=travel, travel_mode=mode)
                     previous = stop["place"]
-                    clock = end + 20
-                day["cost"] = 400 + sum(s["place"]["cost"] for s in day["stops"])
-                day["budget_utilization"] = round(day["cost"] / plan["preferences"]["budget"] * 100)
-            plan["total_cost"] = sum(d["cost"] for d in plan["days"])
-            plan["budget_utilization"] = round(
-                plan["total_cost"] / (plan["preferences"]["budget"] * len(plan["days"])) * 100
-            )
+            allowed = [s["place"] for d in plan["days"] for s in d["stops"]]
+            _, errors = validate_itinerary(raw_itinerary(plan), allowed, preferences)
+            if any(error["type"] != "TOO_FEW_STOPS" for error in errors):
+                raise HTTPException(
+                    422, "This removal makes the route infeasible. Your original plan is unchanged."
+                )
+            refresh_totals(plan)
         connection.execute("UPDATE trips SET plan=? WHERE id=?", (json.dumps(plan), trip_id))
     return {**plan, "id": trip_id}
 
