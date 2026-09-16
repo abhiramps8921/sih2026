@@ -68,10 +68,10 @@ def fallback_score(place, preferences, *, requested=False):
     )
 
 
-def _eligible_places(preferences, excluded):
+def _eligible_places(preferences, excluded, catalog=None):
     return [
         place
-        for place in PLACES
+        for place in (PLACES if catalog is None else catalog)
         if place["id"] not in excluded
         and place["cost"] + 400 <= preferences.budget
         and (not preferences.areas or place["area"] in preferences.areas)
@@ -197,10 +197,12 @@ def _fallback_plan(preferences, candidates, chosen_ids):
     )
 
 
-def generate_plan(preferences, *, excluded=None, requested=None, allow_ai=True):
+def generate_plan(preferences, *, excluded=None, requested=None, allow_ai=True, catalog=None):
     chosen_ids = requested or TEMPLATE_STOPS.get(preferences.template_id, [])
     excluded = set(excluded or []) | set(preferences.excluded_place_ids)
-    available = filter_places(_eligible_places(preferences, excluded), preferences, excluded)
+    available = filter_places(
+        _eligible_places(preferences, excluded, catalog), preferences, excluded
+    )
     local = sorted(
         available,
         key=lambda p: (fallback_score(p, preferences, requested=p["id"] in chosen_ids), p["id"]),
@@ -276,13 +278,15 @@ def generate_plan(preferences, *, excluded=None, requested=None, allow_ai=True):
     return refresh_totals(fallback)
 
 
-def replace_stop(plan, selected, preferences, excluded):
+def replace_stop(plan, selected, preferences, excluded, *, catalog=None):
     """Try nearby alternatives in place, preserving all other stops and days."""
     from copy import deepcopy
 
     occupied = {s["place"]["id"] for d in plan["days"] for s in d["stops"]}
     candidates = filter_places(
-        _eligible_places(preferences, excluded | occupied), preferences, excluded | occupied
+        _eligible_places(preferences, excluded | occupied, catalog),
+        preferences,
+        excluded | occupied,
     )
     candidates.sort(
         key=lambda p: (

@@ -65,15 +65,15 @@ The free Render service stores SQLite data on an ephemeral filesystem, so accoun
 
 `work/backend/roam.db` is created on first start and excluded from Git. Account ownership is resolved through an HttpOnly, SameSite session cookie with a 30-day server-side expiry; logout revokes it. Email addresses are normalized and unique. The tourist/local choice is stored in the database and requested after each login. Authentication attempts are limited per email and client IP. Email verification and password reset are not included. Existing guest API sessions remain isolated and are not automatically transferred to new accounts. Bind manual development servers to loopback; the Render image exposes only the public application port.
 
-The venue hours, costs, review counts, SLH ratings and contributor identities are **sample data**, not live or verified information. Some meal stops represent suggested experiences rather than verified businesses. Routes are approximate walking or local-transit estimates with schematic connecting lines, not road routing. Food and local transport have a separate ₹400 daily allowance. Stay and travel to Kochi are excluded.
+Seeded venue hours, costs, review counts, DEMO SLH ratings and example contributor identities are **sample data**. Live community ratings and tips are separate, unverified personal observations. Some meal stops represent suggested experiences rather than verified businesses. Routes are approximate walking or local-transit estimates with schematic connecting lines, not road routing. Food and local transport have a separate ₹400 daily allowance. Stay and travel to Kochi are excluded.
 
 Premium dining examples are based on the official venue listings for [Kochi Kitchen](https://www.marriott.com/en-us/hotels/cokmc-kochi-marriott-hotel/dining/), [All Spice](https://www.marriott.com/en-us/dining/restaurant-bar/cokic-courtyard-kochi-infopark/7259411-all-spice.mi) and [SkyGrill](https://www.ihg.com/crowneplaza/hotels/gb/en/kochi/cokch/hoteldetail/dining). Their seeded prices remain illustrative and must be confirmed with the venue.
 
-SLH = `(Safety + Legitimacy + Hygiene) / 15 × 100`, with each dimension rated 1–5. Legitimacy is scam resistance: a higher L score means a lower likelihood of misleading listings, hidden charges or untrustworthy operators. Missing or invalid dimensions result in no rating. An itinerary’s score averages its stop dimensions equally. No score certifies safety. No actual reviews are collected yet.
+SLH = `(Safety + Legitimacy + Hygiene) / 15 × 100`, with each dimension rated 1–5. Legitimacy is scam resistance: a higher L score means a lower likelihood of misleading listings, hidden charges or untrustworthy operators. Missing or invalid dimensions result in no rating. An itinerary’s score averages its stop dimensions equally. No score certifies safety. Unverified community ratings and tips are collected separately from demo values.
 
 Community groups collect a name, date, public meeting point, capacity (2–50 including the owner), and interests. Optional itinerary sharing requires explicit consent and publishes only a fixed snapshot of the title and stop names to signed-in travelers. Private trip details and member identities are not exposed. Owners close groups before leaving; closed and past groups cannot accept new members. Family is an explicit planner preference; this catalog has no verified child-suitability information, so it does not change ranking or imply child suitability.
 
-Story publishing, group chat, invitation links, host approval, verified accounts, moderation, multi-city scale and real routing-provider integration remain beyond this local MVP. Native Android/iOS packaging is not included; this deliverable is the responsive web application. Groups and memberships require the same persistent database storage as accounts and trips in deployment.
+Story publishing, group chat, invitation links, host approval, verified accounts, administrator moderation, multi-city scale and real routing-provider integration remain beyond this local MVP. Native Android/iOS packaging is not included; this deliverable is the responsive web application. Groups and memberships require the same persistent database storage as accounts and trips in deployment.
 
 ## Checks
 
@@ -82,9 +82,19 @@ cd work
 npm test
 npm run build
 npm run format:check
-.\.venv\Scripts\python -m pytest backend/test_api.py -q
+.\.venv\Scripts\python -m pytest backend -q
 ```
 
 Backend tests cover schedules, constraints, ownership, persistence, idempotent completion, rewards, bookmarks, editing, story extraction fallback and draft-to-trip conversion. Frontend tests cover SLH calculations and aggregation. GitHub Actions runs tests, formatting and the production build on pushes and pull requests.
 
 All five requested skills are installed under `.agents/skills/`. Photo credits and licenses are available inside the app at `/credits`.
+
+## Place ratings and local tips
+
+Use **Add rating / tip** in the header, **Rate** on mobile, or a place's SLH dialog / active-trip action. `/rate?place=<catalog-id>` preselects a location. A signed-in, role-selected account can submit all three SLH dimensions, a tip of up to 500 characters, or both, with a non-future visit date and a personal-experience acknowledgement. Returning to a place edits the same contribution; deletion removes it. Completed visits are self-reported, never verified.
+
+SQLite `place_contributions` has a unique account/place key and separate rating/tip moderation statuses. `/api/places/{id}/contribution` supports GET, PUT and DELETE; `/api/places/{id}/tips` lists paginated public tips; `/api/tips/{id}/reports` accepts one report per account. Public tips never expose contributor email or account IDs. React renders tip text as escaped text. Input validation rejects excessive links and repeated-character spam.
+
+Community averages never include illustrative seed votes. One or two distinct account ratings display immediately as an **Early community signal**. At three ratings, community SLH replaces demo SLH in filters and planning. Below that threshold, demo values remain labeled DEMO, and locations without demo values remain unrated. Catalog responses, saved-trip hydration, new plans and replacements use current aggregates. Itinerary summaries label mixed sources.
+
+A first report excludes a tip from public responses as reported; three distinct reports mark it hidden pending review. Edits preserve reports and moderation state. Ratings have independent moderation status and are unaffected by tip reports. Authors can delete contributions; a production system still needs an administrator review queue and stronger abuse controls, including protection against delete-and-repost and multiple-account abuse. All observations are unverified and no score guarantees safety.

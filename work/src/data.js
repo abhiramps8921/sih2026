@@ -171,6 +171,21 @@ export function templateSLH(template, places) {
       stops.reduce((sum, p) => sum + p.slh[key], 0) / stops.length,
     ]),
     ['reviews', stops.reduce((sum, p) => sum + p.slh.reviews, 0)],
-    ['reviewed_at', '2026-09-01'],
+    [
+      'reviewed_at',
+      stops
+        .map((p) => p.slh.reviewed_at)
+        .filter(Boolean)
+        .sort()
+        .at(-1) || null,
+    ],
+    [
+      'source',
+      stops.every((p) => p.slh.source === 'community')
+        ? 'community'
+        : stops.some((p) => p.slh.source === 'community')
+          ? 'mixed'
+          : 'demo',
+    ],
   ]);
 }

@@ -361,7 +361,7 @@ export function SLHGuide() {
             SLH brings together community observations to help you compare places. It complements
             your judgment and current local information.
           </p>
-          <span className="tag">Pilot scores are illustrative sample data</span>
+          <span className="tag">DEMO and unverified community scores are labeled separately</span>
         </div>
       </div>
       <div className="community-principles slh-principles">
@@ -405,7 +405,7 @@ export function SLHGuide() {
       <section>
         <div className="section-heading">
           <h2>Look beneath the score.</h2>
-          <p>Select a sample rating to see its breakdown.</p>
+          <p>Select a rating to see its sources and community tips.</p>
         </div>
         <div className="slh-place-list">
           {places.map((p) => (
@@ -413,7 +413,7 @@ export function SLHGuide() {
               <span>
                 <strong>{p.name}</strong>
                 <small>
-                  {p.category} · {p.slh.reviews} illustrative reviews
+                  {p.category} · {p.community_slh?.reviews || 0} community ratings
                 </small>
               </span>
               <SLHPill slh={p.slh} onClick={() => showSLH(p)} />
@@ -422,9 +422,9 @@ export function SLHGuide() {
         </div>
       </section>
       <p className="notice">
-        SLH is not a certification or guarantee. This prototype has no live review collection or
-        verified safety data. A future release should distinguish fresh evidence, review volume, and
-        reports requiring investigation rather than hiding them in an average.
+        SLH is not a certification or safety guarantee. Contributions are unverified personal
+        experiences. At least three distinct account ratings are required before community scores
+        replace DEMO values in filters and planning. Reported tips are excluded pending review.
       </p>
     </main>
   );
@@ -522,7 +522,7 @@ export function Credits() {
         ))}
       </div>
       <p className="notice">
-        Place descriptions, estimates, contributor identities and SLH reviews in the pilot are
+        Seeded place descriptions, estimates, contributor identities and DEMO SLH reviews are
         illustrative. The photos show real locations and food; they are not evidence of the sample
         creators’ visits.
       </p>

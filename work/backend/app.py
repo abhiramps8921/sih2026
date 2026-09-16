@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-from . import ai, auth, db, groups
+from . import ai, auth, contributions, db, groups
 from .catalog import BY_ID, PLACES, REGION_IDS, REGIONS, TEMPLATE_STOPS
 from .planner import generate_plan, replace_stop, venue_key
 from .planning_rules import raw_itinerary, refresh_totals, validate_itinerary
@@ -26,6 +26,7 @@ async def lifespan(app):
 app = FastAPI(title="Roam local travel API", lifespan=lifespan)
 app.include_router(auth.router)
 app.include_router(groups.router)
+app.include_router(contributions.router)
 FRONTEND_DIST = Path(__file__).resolve().parents[1] / "dist"
 
 
@@ -156,13 +157,15 @@ def visited_place_ids(connection, owner):
     }
 
 
-def load_trip(connection, trip_id, owner):
+def load_trip(connection, trip_id, owner, current_catalog=None):
     row = connection.execute(
         "SELECT plan FROM trips WHERE id=? AND owner=?", (trip_id, owner)
     ).fetchone()
     if row is None:
         raise HTTPException(404, "Trip not found in your session.")
     plan = json.loads(row["plan"])
+    if current_catalog is None:
+        current_catalog = {p["id"]: p for p in contributions.current_places(connection)}
     completed = {
         r["stop"]
         for r in connection.execute("SELECT stop FROM completions WHERE trip=?", (trip_id,))
@@ -186,6 +189,7 @@ def load_trip(connection, trip_id, owner):
             excluded=excluded,
             requested=requested,
             allow_ai=False,
+            catalog=list(current_catalog.values()),
         )
         repaired_keys = [
             venue_key(stop["place"]) for day in repaired["days"] for stop in day["stops"]
@@ -199,9 +203,22 @@ def load_trip(connection, trip_id, owner):
         )
     for day in plan["days"]:
         for stop in day["stops"]:
-            current_place = BY_ID.get(stop["place"]["id"])
+            current_place = current_catalog.get(stop["place"]["id"])
             if current_place:
-                stop["place"] = {**current_place, **stop["place"]}
+                stop["place"] = {
+                    **current_place,
+                    **stop["place"],
+                    **{
+                        key: current_place[key]
+                        for key in (
+                            "slh",
+                            "demo_slh",
+                            "community_slh",
+                            "slh_source",
+                            "community_threshold",
+                        )
+                    },
+                }
             stop.setdefault("travel_mode", "walk")
             stop["completed"] = stop["id"] in completed
     plan["id"] = trip_id
@@ -215,7 +232,8 @@ def health():
 
 @app.get("/api/places")
 def places():
-    return PLACES
+    with db.connect() as connection:
+        return contributions.current_places(connection)
 
 
 @app.get("/api/config")
@@ -243,7 +261,8 @@ def me(request: Request):
                 (request.state.owner,),
             )
         ]
-        trips = [load_trip(connection, id, request.state.owner) for id in ids]
+        current_catalog = {p["id"]: p for p in contributions.current_places(connection)}
+        trips = [load_trip(connection, id, request.state.owner, current_catalog) for id in ids]
         count = sum(s["completed"] for t in trips for d in t["days"] for s in d["stops"])
         completed_days = sum(
             all(s["completed"] for s in d["stops"]) for t in trips for d in t["days"]
@@ -284,7 +303,9 @@ def create_trip(preferences: Preferences, request: Request):
             else visited_place_ids(connection, request.state.owner)
         )
         try:
-            plan = generate_plan(preferences, excluded=excluded)
+            plan = generate_plan(
+                preferences, excluded=excluded, catalog=contributions.current_places(connection)
+            )
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
         connection.execute(
@@ -319,7 +340,13 @@ def edit_trip(trip_id: str, change: EditTrip, request: Request):
             if not preferences.include_visited:
                 excluded |= visited_place_ids(connection, request.state.owner)
             try:
-                revised = replace_stop(plan, selected, preferences, excluded)
+                revised = replace_stop(
+                    plan,
+                    selected,
+                    preferences,
+                    excluded,
+                    catalog=contributions.current_places(connection),
+                )
             except ValueError as exc:
                 raise HTTPException(422, str(exc)) from exc
             old_ids = {s["place"]["id"] for s in all_stops}
@@ -502,7 +529,12 @@ def schedule_draft(payload: DraftTrip, request: Request):
                 if preferences.include_visited
                 else visited_place_ids(connection, request.state.owner)
             )
-            plan = generate_plan(preferences, excluded=excluded, requested=content["place_ids"])
+            plan = generate_plan(
+                preferences,
+                excluded=excluded,
+                requested=content["place_ids"],
+                catalog=contributions.current_places(connection),
+            )
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
         plan["source_draft"] = payload.draft_id

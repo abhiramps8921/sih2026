@@ -289,7 +289,10 @@ export function Planner() {
               <option value="80">80+ — higher sample ratings</option>
               <option value="90">90+ — highest sample ratings</option>
             </select>
-            <small>SLH ratings are illustrative demo data, not guarantees.</small>
+            <small>
+              SLH uses community ratings after three accounts, otherwise DEMO values where
+              available. No score guarantees safety.
+            </small>
           </label>
           <label className="field">
             Describe the kind of trip you want (optional)
@@ -805,6 +808,18 @@ export function ActiveTrip() {
                       {stop.completed ? 'Completed · Undo' : 'Mark as complete'}
                     </button>
                     <div className="route-actions">
+                      <Link
+                        className="navigation-link"
+                        to={`/rate?place=${encodeURIComponent(stop.place.id)}`}
+                      >
+                        {stop.completed ? 'Rate your visit' : 'Add rating / tip'}
+                      </Link>
+                      <Link
+                        className="navigation-link"
+                        to={`/rate?place=${encodeURIComponent(stop.place.id)}`}
+                      >
+                        {stop.completed ? 'Rate your visit' : 'Add rating / tip'}
+                      </Link>
                       <button
                         type="button"
                         className="navigation-link"
@@ -842,7 +857,7 @@ export function ActiveTrip() {
           <p className="notice">{trip.cost_note}</p>
           <p className="small-copy">
             {trip.method}. Self-reported completion earns points; it does not verify a visit. SLH
-            scores are sample data.
+            scores are labeled DEMO or unverified community data.
           </p>
         </aside>
       </div>

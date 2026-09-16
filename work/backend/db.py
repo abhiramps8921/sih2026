@@ -52,6 +52,28 @@ def initialize():
             PRIMARY KEY(group_id, account_id)
         );
         CREATE INDEX IF NOT EXISTS memberships_account ON group_memberships(account_id);
+        CREATE TABLE IF NOT EXISTS place_contributions (
+            id TEXT PRIMARY KEY, owner TEXT NOT NULL REFERENCES accounts(id),
+            place TEXT NOT NULL, safety INTEGER, legitimacy INTEGER, hygiene INTEGER,
+            tip TEXT NOT NULL DEFAULT '', tip_category TEXT,
+            visit_date TEXT NOT NULL,
+            rating_status TEXT NOT NULL DEFAULT 'published' CHECK(rating_status IN ('published','hidden')),
+            tip_status TEXT NOT NULL DEFAULT 'published' CHECK(tip_status IN ('published','reported','hidden')),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            UNIQUE(owner, place),
+            CHECK((safety IS NULL AND legitimacy IS NULL AND hygiene IS NULL) OR
+                  (safety IS NOT NULL AND legitimacy IS NOT NULL AND hygiene IS NOT NULL AND
+                   safety BETWEEN 1 AND 5 AND legitimacy BETWEEN 1 AND 5 AND hygiene BETWEEN 1 AND 5)),
+            CHECK(safety IS NOT NULL OR length(trim(tip)) > 0)
+        );
+        CREATE INDEX IF NOT EXISTS contributions_place ON place_contributions(place);
+        CREATE TABLE IF NOT EXISTS tip_reports (
+            contribution TEXT NOT NULL REFERENCES place_contributions(id) ON DELETE CASCADE,
+            reporter TEXT NOT NULL REFERENCES accounts(id),
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(contribution, reporter)
+        );
         """)
         completed_stops = db.execute(
             "SELECT t.owner, t.plan, c.stop FROM completions c JOIN trips t ON t.id=c.trip"

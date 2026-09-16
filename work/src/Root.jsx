@@ -3,6 +3,7 @@ import { Link, NavLink, Routes, Route, useLocation } from 'react-router-dom';
 import { Compass, Map, Users, Plus, Footprints, LoaderCircle, Sparkles } from 'lucide-react';
 import Explore from './Explore';
 import Auth from './Auth';
+import Rate from './Rate';
 import { api, send } from './api';
 import { AppContext } from './context';
 import { SLHDetails } from './components';
@@ -38,6 +39,11 @@ export default function App() {
     const profile = await api('/me');
     setMe(profile);
     return profile;
+  }
+  async function refreshCommunity() {
+    const [profile, currentPlaces] = await Promise.all([api('/me'), api('/places')]);
+    setMe(profile);
+    setPlaces(currentPlaces);
   }
   async function load() {
     setStatus('loading');
@@ -100,6 +106,7 @@ export default function App() {
         places,
         regions,
         refresh,
+        refreshCommunity,
         toggleSave,
         bookmarkBusy,
         notify: setToast,
@@ -136,9 +143,18 @@ export default function App() {
                 <Users size={18} />
                 Community
               </NavLink>
+              <NavLink to="/rate" className="mobile-rate">
+                <Plus size={18} />
+                Rate
+              </NavLink>
             </nav>
           )}
           <div className="header-actions">
+            {me.user?.role_selected && (
+              <Link className="button dark desktop-rate" to="/rate">
+                Add rating / tip
+              </Link>
+            )}
             {me.user?.role_selected && (
               <Link className="text-button share-link" to="/create">
                 <Plus size={17} />
@@ -185,6 +201,7 @@ export default function App() {
           <Route path="/trips" element={<MyTrips />} />
           <Route path="/trips/:id" element={<ActiveTrip />} />
           <Route path="/community" element={<Community />} />
+          <Route path="/rate" element={<Rate />} />
           <Route path="/create" element={<CreateTrip />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/slh" element={<SLHGuide />} />

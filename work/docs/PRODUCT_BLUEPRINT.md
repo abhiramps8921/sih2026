@@ -28,7 +28,7 @@ The MVP focuses on Kochi, Kerala, with seeded sample content. It includes:
 - Optional AI-assisted story extraction with an explicit opt-in.
 - A labeled demonstration of group discovery and join requests.
 
-Authentication, public publishing, payments, real-time chat, live stranger matching, review moderation, multi-city scale and native application packaging remain future work.
+Authentication, public publishing, payments, real-time chat, live stranger matching, administrator review moderation, multi-city scale and native application packaging remain future work.
 
 ## SLH score
 
@@ -93,3 +93,13 @@ The frontend never receives service credentials. All persistent mutations pass t
 8. Show the community screen while clearly stating that matching is a demo.
 
 The pitch is: reliable local context, practical scheduling and transparent trust signals in one followable trip.
+
+## Place ratings and local tips
+
+Use **Add rating / tip** in the header, **Rate** on mobile, or a place's SLH dialog / active-trip action. `/rate?place=<catalog-id>` preselects a location. A signed-in, role-selected account can submit all three SLH dimensions, a tip of up to 500 characters, or both, with a non-future visit date and a personal-experience acknowledgement. Returning to a place edits the same contribution; deletion removes it. Completed visits are self-reported, never verified.
+
+SQLite `place_contributions` has a unique account/place key and separate rating/tip moderation statuses. `/api/places/{id}/contribution` supports GET, PUT and DELETE; `/api/places/{id}/tips` lists paginated public tips; `/api/tips/{id}/reports` accepts one report per account. Public tips never expose contributor email or account IDs. React renders tip text as escaped text. Input validation rejects excessive links and repeated-character spam.
+
+Community averages never include illustrative seed votes. One or two distinct account ratings display immediately as an **Early community signal**. At three ratings, community SLH replaces demo SLH in filters and planning. Below that threshold, demo values remain labeled DEMO, and locations without demo values remain unrated. Catalog responses, saved-trip hydration, new plans and replacements use current aggregates. Itinerary summaries label mixed sources.
+
+A first report excludes a tip from public responses as reported; three distinct reports mark it hidden pending review. Edits preserve reports and moderation state. Ratings have independent moderation status and are unaffected by tip reports. Authors can delete contributions; a production system still needs an administrator review queue and stronger abuse controls, including protection against delete-and-repost and multiple-account abuse. All observations are unverified and no score guarantees safety.
